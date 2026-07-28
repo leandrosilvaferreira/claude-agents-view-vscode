@@ -121,7 +121,13 @@ subagents → dedupe/nest → render tree. All source under `src/`:
 - **sessionScanner.ts** — discovers Claude (`~/.claude/projects/**/*.jsonl`) and
   Antigravity (`~/.gemini/.../transcript.jsonl`) log files. Pure, never throws.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads
-  only appended bytes); builds a `Session`, delegates title + subagent extraction.
+  only appended bytes); builds a `Session`, delegates title, subagent and project-path
+  extraction.
+- **projectPathResolver.ts** — works out which project a transcript belongs to: Claude
+  Code's `cwd` (preferred) or its ambiguous encoded directory name, Antigravity's prose
+  metadata / tool-call `Cwd`, else walks up for a project marker.
+- **sessionActivity.ts** — decides whether a session is still running (`lsof`, recent
+  write, user turn awaiting a reply, thinking-only last turn, or live subagents).
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
 - **nameExtractor.ts** — derives the session title from the first real user prompt,
@@ -139,7 +145,8 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   logs via `logDebug` and returns an empty/fallback value; a bad log line must never
   break the tree.
 - **Keep `vscode` out of the parsing core** — `logParser`, `subagentDetector`,
-  `nameExtractor`, `sessionDedupe`, `sessionScanner` import no `vscode` and are
+  `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`, `sessionActivity`
+  import no `vscode` and are
   unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,
   `treeItems.ts` touch the VS Code API.
 - **Parse incrementally** — `LogParser` caches a per-file byte offset and reads only
