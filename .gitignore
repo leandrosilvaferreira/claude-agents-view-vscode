@@ -35,3 +35,5 @@ vault-obsidian/
 .claude/scripts/node_modules/
 .claude/scripts/package.json
 .claude/scripts/package-lock.json
+# aia-harness
+.claude/.aia-harness-pending/
