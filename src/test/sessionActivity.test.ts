@@ -1,0 +1,78 @@
+import { describe, it, expect } from 'vitest';
+import { computeSessionStatus } from '../sessionActivity';
+import { Session } from '../types';
+
+const FIVE_MINUTES = 5 * 60 * 1000;
+const THIRTY_ONE_MINUTES = 31 * 60 * 1000;
+
+function session(overrides: Partial<Session> = {}): Session {
+  return {
+    id: 'session-1',
+    projectHash: '-Users-dev-Projects-acme',
+    projectPath: '/Users/dev/Projects/acme',
+    projectName: 'acme',
+    gitBranch: 'main',
+    status: 'stopped',
+    lastInteractionTime: Date.now() - FIVE_MINUTES,
+    subagents: [],
+    logFilePath: '/Users/dev/.claude/projects/acme/session-1.jsonl',
+    type: 'claude-code',
+    ...overrides,
+  };
+}
+
+describe('computeSessionStatus', () => {
+  const noOpenFiles = new Set<string>();
+
+  it('keeps a session working while its last turn is a thinking block', () => {
+    // Claude Code streams reasoning as its own thinking-only entry, so the transcript can sit
+    // untouched for minutes mid-reply. Without this the sidebar showed the session as stopped
+    // exactly while the user was watching it think.
+    const status = computeSessionStatus(session({ lastEntryIsThinking: true }), noOpenFiles);
+
+    expect(status).toBe('working');
+  });
+
+  it('stops a quiet session whose last turn already produced its answer', () => {
+    const status = computeSessionStatus(session({ lastEntryIsThinking: false }), noOpenFiles);
+
+    expect(status).toBe('stopped');
+  });
+
+  it('stops a session left thinking past the idle ceiling', () => {
+    // A session abandoned mid-turn must not spin forever.
+    const stale = session({
+      lastEntryIsThinking: true,
+      lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES,
+    });
+
+    expect(computeSessionStatus(stale, noOpenFiles)).toBe('stopped');
+  });
+
+  it('reports working right after a write, before any heuristic is consulted', () => {
+    const status = computeSessionStatus(session({ lastInteractionTime: Date.now() - 5_000 }), noOpenFiles);
+
+    expect(status).toBe('working');
+  });
+
+  it('reports working while a subagent never reported completion', () => {
+    const withAgent = session({
+      subagents: [{ id: 'toolu_1', name: 'explorer', task: 'map the codebase', status: 'working' }],
+    });
+
+    expect(computeSessionStatus(withAgent, noOpenFiles)).toBe('working');
+  });
+
+  it('still reports working for a user turn awaiting a reply', () => {
+    const status = computeSessionStatus(session({ lastEntryType: 'user' }), noOpenFiles);
+
+    expect(status).toBe('working');
+  });
+
+  it('reports working when the log file is held open, whatever the heuristics say', () => {
+    const stale = session({ lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES });
+    const open = new Set([stale.logFilePath]);
+
+    expect(computeSessionStatus(stale, open)).toBe('working');
+  });
+});

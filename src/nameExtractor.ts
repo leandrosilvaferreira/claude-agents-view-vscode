@@ -34,6 +34,16 @@ function isScaffold(text: string): boolean {
   return SCAFFOLD_PREFIXES.some((p) => t.startsWith(p));
 }
 
+/**
+ * The title the user typed to rename the session, when this entry is a rename. Claude Code writes
+ * one `type:"custom-title"` entry per rename, so the last one in the transcript is the name it
+ * shows — and being an explicit human choice, it outranks anything derived or generated.
+ */
+export function extractRenamedTitle(json: { type?: string; customTitle?: string }): string | null {
+  if (json.type !== 'custom-title' || typeof json.customTitle !== 'string') return null;
+  return json.customTitle.trim() || null;
+}
+
 export function extractSessionName(json: LogEntryForName): string | null {
   if (json.isMeta === true) return null;
   const name = extractAntigravityName(json) || extractClaudeName(json) || extractGenericName(json);

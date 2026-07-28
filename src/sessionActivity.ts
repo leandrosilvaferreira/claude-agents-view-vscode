@@ -12,10 +12,11 @@ import { logDebug } from './logger';
  * stopped during any quiet stretch: a backgrounded agent can run for minutes without the parent
  * transcript gaining a single line, which is exactly when the user is watching it work.
  *
- * So: recent write, OR the last entry is a user turn (Claude owes a reply), OR it still has
- * subagents that never reported completion. The last two are capped by IDLE_CEILING so a session
- * abandoned mid-turn, or one whose agent completion notification we missed, eventually goes
- * quiet instead of spinning forever.
+ * So: recent write, OR the last entry is a user turn (Claude owes a reply), OR the last turn is a
+ * thinking-only block (Claude is mid-reply — its text/tool_use always arrives in a later entry),
+ * OR it still has subagents that never reported completion. Those three are capped by
+ * IDLE_CEILING so a session abandoned mid-turn, or one whose agent completion notification we
+ * missed, eventually goes quiet instead of spinning forever.
  */
 export function computeSessionStatus(session: Session, openFiles: Set<string>): 'working' | 'stopped' {
   if (openFiles.has(path.normalize(session.logFilePath))) {
@@ -31,8 +32,9 @@ export function computeSessionStatus(session: Session, openFiles: Set<string>): 
     return 'stopped';
   }
   const awaitingReply = session.lastEntryType === 'user';
+  const isThinking = session.lastEntryIsThinking === true;
   const hasRunningAgents = session.subagents.some((sub) => sub.status === 'working');
-  return awaitingReply || hasRunningAgents ? 'working' : 'stopped';
+  return awaitingReply || isThinking || hasRunningAgents ? 'working' : 'stopped';
 }
 
 /** Set of transcript files currently held open, per `lsof`. Scoped to ~/.claude and ~/.gemini to

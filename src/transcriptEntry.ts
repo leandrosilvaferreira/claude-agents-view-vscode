@@ -57,4 +57,7 @@ export interface LogEntry {
   version?: string;
   TargetFile?: string;
   aiTitle?: string;
+  // Title the user typed to rename the session, on a `type: 'custom-title'` entry. Rewritten
+  // on every rename, so the last one in the transcript is the one in effect.
+  customTitle?: string;
 }

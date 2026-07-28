@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Session, SubAgent } from './types';
-import { extractSessionName } from './nameExtractor';
+import { extractRenamedTitle, extractSessionName } from './nameExtractor';
+import { ProjectPathResolver } from './projectPathResolver';
 import { detectSubagents } from './subagentDetector';
 import { LogEntry } from './transcriptEntry';
 
@@ -25,7 +26,7 @@ interface LogLineContext {
 
 export class LogParser {
   private cache = new Map<string, { lastReadOffset: number; session: Session }>();
-  private decodedPathCache = new Map<string, string>();
+  private projectPaths = new ProjectPathResolver();
   private claudeProjectsPath: string;
 
   constructor(claudeProjectsPath?: string) {
@@ -108,9 +109,7 @@ export class LogParser {
       if (json.isSidechain === true) {
         session.isSidechain = true;
       }
-      if (typeof json.type === 'string') {
-        session.lastEntryType = json.type;
-      }
+      this.trackTurnSignals(json, session);
       if (typeof json.entrypoint === 'string') {
         session.entrypoint = json.entrypoint;
       }
@@ -119,7 +118,7 @@ export class LogParser {
       }
       this.parseTimestamp(json, session, stats);
       this.parseGitBranch(json, session);
-      this.detectProjectPath(json, session);
+      this.projectPaths.detectProjectPath(json, session);
       this.detectSessionModel(json, session);
 
       this.detectSessionTitle(json, session);
@@ -130,7 +129,48 @@ export class LogParser {
     }
   }
 
+  /**
+   * Record whether Claude still owes this session a reply.
+   *
+   * Both signals describe the SESSION's own conversation, so a sidechain entry must never set
+   * them: subagent turns can be interleaved into the parent's file, and a subagent thinks and
+   * replies exactly like the session does — letting those through would report the parent as
+   * working off the subagent's turn.
+   *
+   * Claude Code streams a reasoning block as its own entry carrying nothing but `thinking`; the
+   * turn's text/tool_use always lands in a later entry. So a transcript whose last conversational
+   * turn is thinking-only is one Claude is still working on. Only turns carrying `message.content`
+   * update that flag, so a trailing `custom-title`/snapshot entry doesn't clear the signal.
+   */
+  private trackTurnSignals(json: LogEntry, session: Session): void {
+    if (json.isSidechain === true) {
+      return;
+    }
+    if (typeof json.type === 'string') {
+      session.lastEntryType = json.type;
+    }
+    const blocks = Array.isArray(json.message?.content) ? json.message.content : null;
+    if (blocks) {
+      session.lastEntryIsThinking = blocks.some((block) => block?.type === 'thinking');
+    }
+  }
+
   private detectSessionTitle(json: LogEntry, session: Session): void {
+    // A rename the user typed wins over anything derived. A later rename still applies (each one
+    // is its own entry), but no generated title may take it back — hence the latch rather than
+    // relying on assignment order, since an `ai-title` can land after the rename.
+    const renamed = extractRenamedTitle(json);
+    if (renamed) {
+      // Not truncated at 60 like a derived title below: this is the exact text the user typed,
+      // and it is what Claude Code itself shows. The tree view elides anything too long.
+      session.sessionTitle = renamed;
+      session.nameFromPrompt = true;
+      session.titleIsCustom = true;
+      return;
+    }
+    if (session.titleIsCustom) {
+      return;
+    }
     if (!session.nameFromPrompt) {
       const extractedName = extractSessionName(json);
       if (extractedName) {
@@ -180,115 +220,6 @@ export class LogParser {
     }
   }
 
-  private detectProjectPath(json: LogEntry, session: Session): void {
-    if (session.type === 'claude-code') {
-      this.detectClaudeCodeProjectPath(json, session);
-      return;
-    }
-
-    // 1. Extract from Active Document metadata in USER_INPUT
-    if (json.type === 'USER_INPUT' && typeof json.content === 'string') {
-      const activeDocMatch = json.content.match(/Active Document:\s*([^\n]+)/);
-      if (activeDocMatch) {
-        session.projectPath = this.findProjectRoot(activeDocMatch[1].trim());
-        return;
-      }
-      const otherDocMatch = json.content.match(/Other open documents:\s*-\s*([^\n]+)/);
-      if (otherDocMatch) {
-        session.projectPath = this.findProjectRoot(otherDocMatch[1].trim());
-        return;
-      }
-    }
-
-    // 2. Extract from Cwd
-    const cwd = this.extractCwd(json);
-    if (cwd) {
-      session.projectPath = cwd;
-      return;
-    }
-
-    // 3. Extract from TargetFile
-    if (json.TargetFile) {
-      session.projectPath = this.findProjectRoot(json.TargetFile);
-    }
-  }
-
-  private detectClaudeCodeProjectPath(json: LogEntry, session: Session): void {
-    // The project-directory name Claude Code encodes to (e.g. `-Users-me-aia_harness` for
-    // `/Users/me/aia_harness`) is ambiguous to decode: every non-alphanumeric character,
-    // including `_` and `.`, collapses to the same `-` as the path separator. The transcript's
-    // own `cwd` field carries the real, unambiguous path — always prefer it over the guess.
-    if (typeof json.cwd === 'string' && json.cwd.trim()) {
-      session.projectPath = json.cwd.trim();
-      session.projectName = path.basename(session.projectPath) || session.projectName;
-    }
-  }
-
-  private extractCwd(json: LogEntry): string | null {
-    if (json.Cwd) {
-      return json.Cwd;
-    }
-
-    if (json.tool_calls && Array.isArray(json.tool_calls)) {
-      for (const tc of json.tool_calls) {
-        const cwd = tc.Cwd || tc.arguments?.Cwd || tc.Arguments?.Cwd;
-        if (cwd) {
-          return cwd;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private findProjectRoot(filePath: string): string {
-    try {
-      let current = path.dirname(filePath);
-      while (current && current !== '/' && current.length > 1) {
-        if (
-          fs.existsSync(path.join(current, '.git')) ||
-          fs.existsSync(path.join(current, '.claude')) ||
-          fs.existsSync(path.join(current, '.agents')) ||
-          fs.existsSync(path.join(current, 'package.json'))
-        ) {
-          return current;
-        }
-        current = path.dirname(current);
-      }
-    } catch {
-      // Ignore filesystem check errors
-    }
-    return path.dirname(filePath);
-  }
-
-  private decodeClaudeProjectPath(projectDir: string): string {
-    if (!projectDir.startsWith('-')) return projectDir;
-    const cached = this.decodedPathCache.get(projectDir);
-    if (cached !== undefined) return cached;
-
-    const parts = projectDir.substring(1).split('-');
-    let currentPath = '/';
-    let i = 0;
-    while (i < parts.length) {
-      let foundNext = false;
-      for (let len = parts.length - i; len > 0; len--) {
-        const candidate = path.join(currentPath, parts.slice(i, i + len).join('-'));
-        if (fs.existsSync(candidate)) {
-          currentPath = candidate;
-          i += len;
-          foundNext = true;
-          break;
-        }
-      }
-      if (!foundNext) {
-        currentPath = path.join(currentPath, parts[i]);
-        i++;
-      }
-    }
-    this.decodedPathCache.set(projectDir, currentPath);
-    return currentPath;
-  }
-
   private createEmptySession(filePath: string, type: 'claude-code' | 'antigravity'): Session {
     const fileBasename = path.basename(filePath, '.jsonl');
 
@@ -306,7 +237,7 @@ export class LogParser {
 
     const decodedPath =
       type === 'claude-code'
-        ? this.decodeClaudeProjectPath(projectDir)
+        ? this.projectPaths.decodeClaudeProjectPath(projectDir)
         : path.dirname(path.dirname(path.dirname(filePath)));
     const sessionId = type === 'claude-code' ? fileBasename : projectDir;
     const projectName =

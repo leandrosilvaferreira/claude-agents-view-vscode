@@ -1,0 +1,133 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { LogEntry } from './transcriptEntry';
+import { Session } from './types';
+
+/**
+ * Works out which project a transcript belongs to.
+ *
+ * Neither brand states it outright. Claude Code encodes the project directory into the folder
+ * name and stamps the real `cwd` on every entry; Antigravity states it only inside prose fields
+ * ("Active Document: …") or a tool call's `Cwd`. Both cases fall back to walking up the file
+ * system for a project marker. Kept out of LogParser because none of it depends on the
+ * incremental-read machinery — it only ever looks at one entry, or one path, at a time.
+ */
+export class ProjectPathResolver {
+  private decodedPathCache = new Map<string, string>();
+
+  /** Fill in `session.projectPath` from whatever this entry reveals. Silent when it reveals nothing. */
+  public detectProjectPath(json: LogEntry, session: Session): void {
+    if (session.type === 'claude-code') {
+      this.detectClaudeCodeProjectPath(json, session);
+      return;
+    }
+
+    // 1. Extract from Active Document metadata in USER_INPUT
+    if (json.type === 'USER_INPUT' && typeof json.content === 'string') {
+      const activeDocMatch = json.content.match(/Active Document:\s*([^\n]+)/);
+      if (activeDocMatch) {
+        session.projectPath = this.findProjectRoot(activeDocMatch[1].trim());
+        return;
+      }
+      const otherDocMatch = json.content.match(/Other open documents:\s*-\s*([^\n]+)/);
+      if (otherDocMatch) {
+        session.projectPath = this.findProjectRoot(otherDocMatch[1].trim());
+        return;
+      }
+    }
+
+    // 2. Extract from Cwd
+    const cwd = this.extractCwd(json);
+    if (cwd) {
+      session.projectPath = cwd;
+      return;
+    }
+
+    // 3. Extract from TargetFile
+    if (json.TargetFile) {
+      session.projectPath = this.findProjectRoot(json.TargetFile);
+    }
+  }
+
+  /**
+   * Best-effort reconstruction of a real path from Claude Code's encoded project-directory name.
+   * Only a fallback: `detectProjectPath` prefers the transcript's own `cwd`, because the encoding
+   * collapses every non-alphanumeric character — including `_` and `.` — onto the same `-` as the
+   * path separator, making it ambiguous to decode. Walks the file system to disambiguate.
+   */
+  public decodeClaudeProjectPath(projectDir: string): string {
+    if (!projectDir.startsWith('-')) return projectDir;
+    const cached = this.decodedPathCache.get(projectDir);
+    if (cached !== undefined) return cached;
+
+    const parts = projectDir.substring(1).split('-');
+    let currentPath = '/';
+    let i = 0;
+    while (i < parts.length) {
+      let foundNext = false;
+      for (let len = parts.length - i; len > 0; len--) {
+        const candidate = path.join(currentPath, parts.slice(i, i + len).join('-'));
+        if (fs.existsSync(candidate)) {
+          currentPath = candidate;
+          i += len;
+          foundNext = true;
+          break;
+        }
+      }
+      if (!foundNext) {
+        currentPath = path.join(currentPath, parts[i]);
+        i++;
+      }
+    }
+    this.decodedPathCache.set(projectDir, currentPath);
+    return currentPath;
+  }
+
+  private detectClaudeCodeProjectPath(json: LogEntry, session: Session): void {
+    // The project-directory name Claude Code encodes to (e.g. `-Users-me-aia_harness` for
+    // `/Users/me/aia_harness`) is ambiguous to decode: every non-alphanumeric character,
+    // including `_` and `.`, collapses to the same `-` as the path separator. The transcript's
+    // own `cwd` field carries the real, unambiguous path — always prefer it over the guess.
+    if (typeof json.cwd === 'string' && json.cwd.trim()) {
+      session.projectPath = json.cwd.trim();
+      session.projectName = path.basename(session.projectPath) || session.projectName;
+    }
+  }
+
+  private extractCwd(json: LogEntry): string | null {
+    if (json.Cwd) {
+      return json.Cwd;
+    }
+
+    if (json.tool_calls && Array.isArray(json.tool_calls)) {
+      for (const tc of json.tool_calls) {
+        const cwd = tc.Cwd || tc.arguments?.Cwd || tc.Arguments?.Cwd;
+        if (cwd) {
+          return cwd;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private findProjectRoot(filePath: string): string {
+    try {
+      let current = path.dirname(filePath);
+      while (current && current !== '/' && current.length > 1) {
+        if (
+          fs.existsSync(path.join(current, '.git')) ||
+          fs.existsSync(path.join(current, '.claude')) ||
+          fs.existsSync(path.join(current, '.agents')) ||
+          fs.existsSync(path.join(current, 'package.json'))
+        ) {
+          return current;
+        }
+        current = path.dirname(current);
+      }
+    } catch {
+      // Ignore filesystem check errors
+    }
+    return path.dirname(filePath);
+  }
+}

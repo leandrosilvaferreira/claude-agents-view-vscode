@@ -20,6 +20,10 @@ describe('LogParser against real Claude Code logs', () => {
 
     expect(session.gitBranch).toBe('fix/713-typed-wrapper-context');
     expect(session.subagents.length).toBe(46);
+    // This transcript carries 115 `custom-title` entries (the session was renamed repeatedly);
+    // the last one is the name Claude Code shows, so it must be the one that survives.
+    expect(session.sessionTitle).toBe('Sample text 620');
+    expect(session.titleIsCustom).toBe(true);
 
     const stillWorking = session.subagents.filter((s) => s.status === 'working');
     // Before the fix, detectCompletions() only checked a top-level `tool_use_id` that never
