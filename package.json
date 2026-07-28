@@ -1,0 +1,153 @@
+{
+  "name": "claude-agents-monitor",
+  "displayName": "Claude & Antigravity Agent Monitor",
+  "description": "Lightweight VS Code sidebar monitor for active Claude Code and Google Antigravity sessions and subagents.",
+  "version": "0.1.9",
+  "publisher": "leandro-silva",
+  "license": "Apache-2.0",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/leandrosilvaferreira/claude-agents-view-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/leandrosilvaferreira/claude-agents-view-vscode/issues"
+  },
+  "homepage": "https://github.com/leandrosilvaferreira/claude-agents-view-vscode#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "antigravity",
+    "agents",
+    "monitor"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-agents-monitor-container",
+          "title": "Agent Monitor",
+          "icon": "$(robot)"
+        }
+      ]
+    },
+    "views": {
+      "claude-agents-monitor-container": [
+        {
+          "id": "claude-sessions-view",
+          "name": "Active Sessions & Subagents",
+          "type": "tree"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claude-sessions-view.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claude-sessions-view.openSessionLog",
+        "title": "Open Log File",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "claude-sessions-view.openProject",
+        "title": "Open Project Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "claude-sessions-view.enable",
+        "title": "Enable Agent Monitoring",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "claude-sessions-view.disable",
+        "title": "Disable Agent Monitoring",
+        "icon": "$(eye)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claude-sessions-view.disable",
+          "when": "view == claude-sessions-view && config.claudeAgentsMonitor.enabled",
+          "group": "navigation@0"
+        },
+        {
+          "command": "claude-sessions-view.enable",
+          "when": "view == claude-sessions-view && !config.claudeAgentsMonitor.enabled",
+          "group": "navigation@0"
+        },
+        {
+          "command": "claude-sessions-view.refresh",
+          "when": "view == claude-sessions-view && config.claudeAgentsMonitor.enabled",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "claude-sessions-view.openSessionLog",
+          "when": "view == claude-sessions-view && viewItem == session",
+          "group": "inline"
+        },
+        {
+          "command": "claude-sessions-view.openProject",
+          "when": "view == claude-sessions-view && viewItem == session",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude & Antigravity Agent Monitor",
+      "properties": {
+        "claudeAgentsMonitor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Monitor Claude Code and Antigravity sessions. When disabled, the extension stops reading logs in every window/instance. Monitoring only resumes when you re-enable it (button at the top of the panel) or change this setting."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "node esbuild.js",
+    "watch-esbuild": "node esbuild.js --watch",
+    "vscode:prepublish": "node esbuild.js --minify",
+    "package": "rm -f *.vsix && npm version patch --no-git-tag-version && npx @vscode/vsce package --no-dependencies",
+    "package:ci": "rm -f *.vsix && npx @vscode/vsce package --no-dependencies",
+    "publish:ovsx": "npx ovsx publish *.vsix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18",
+    "@types/vscode": "^1.90.0",
+    "@vitest/coverage-v8": "^1.4.0",
+    "esbuild": "^0.17.19",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import-x": "^0.5.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-sonarjs": "^1.0.3",
+    "prettier": "^3.2.5",
+    "typescript": "^5.0.4",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^1.4.0"
+  }
+}
