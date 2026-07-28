@@ -65,7 +65,7 @@ code --install-extension claude-agents-monitor-0.1.0.vsix --force
 Then reload the window (Command Palette → _Developer: Reload Window_). The 🤖 **Agent Monitor**
 icon appears in the activity bar.
 
-To uninstall: `antigravity-ide --uninstall-extension leandro-silva.claude-agents-monitor`.
+To uninstall: `antigravity-ide --uninstall-extension leandrosilvaferreira.claude-agents-monitor`.
 
 ## Configuration
 

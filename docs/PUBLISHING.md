@@ -31,10 +31,12 @@ Copy the value immediately — it is shown only once.
 
 ### 4. Create the namespace
 
-The namespace must match `publisher` in `package.json` (`leandro-silva`):
+The namespace must match `publisher` in `package.json` (`leandrosilvaferreira`). It is
+kept identical to the GitHub ID on purpose — that is the one form of evidence the
+namespace-ownership claim accepts without DNS records or manual review:
 
 ```bash
-npx ovsx create-namespace leandro-silva -p <YOUR_TOKEN>
+npx ovsx create-namespace leandrosilvaferreira -p <YOUR_TOKEN>
 ```
 
 ### 5. Add the token as a GitHub secret
@@ -97,8 +99,13 @@ Two consequences:
 ## Optional
 
 - **Verified namespace** — removes the "unverified publisher" warning on the listing.
-  Open a request at [github.com/EclipseFdn/open-vsx.org/issues](https://github.com/EclipseFdn/open-vsx.org/issues)
-  using the _Namespace ownership_ template.
+  Open a _Claim namespace ownership_ issue at
+  [github.com/EclipseFdn/open-vsx.org/issues](https://github.com/EclipseFdn/open-vsx.org/issues).
+  This project qualifies under **Option 3** ("Not a VS Code Marketplace Publisher") via
+  _"The namespace matches the GitHub ID making this request"_ — which is exactly why the
+  namespace is `leandrosilvaferreira` and not a prettier variant. Any other namespace would
+  fall through to Option 4, the discretionary manual-review path. The claim also requires
+  12+ months of public GitHub history.
 - **Also publish to the VS Code Marketplace** — needs a separate Azure DevOps publisher and
   PAT. Add a step to `release.yml` after the Open VSX one:
 

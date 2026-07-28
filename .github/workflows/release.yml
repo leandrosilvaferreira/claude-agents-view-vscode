@@ -55,6 +55,20 @@ jobs:
           echo "vsix size: $size bytes"
           test "$size" -lt 2000000 || { echo "::error::.vsix too large — check .vscodeignore"; exit 1; }
 
+      # The namespace has to exist before the first publish into it. Checking the public
+      # API first keeps this idempotent without swallowing a real create-namespace failure.
+      - name: Ensure Open VSX namespace exists
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: |
+          ns=$(node -p "require('./package.json').publisher")
+          if curl -sf "https://open-vsx.org/api/$ns" > /dev/null; then
+            echo "namespace $ns already exists"
+          else
+            echo "creating namespace $ns"
+            npx ovsx create-namespace "$ns"
+          fi
+
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
