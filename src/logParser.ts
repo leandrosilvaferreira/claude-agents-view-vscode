@@ -139,17 +139,28 @@ export class LogParser {
    *
    * Claude Code streams a reasoning block as its own entry carrying nothing but `thinking`; the
    * turn's text/tool_use always lands in a later entry. So a transcript whose last conversational
-   * turn is thinking-only is one Claude is still working on. Only turns carrying `message.content`
-   * update that flag, so a trailing `custom-title`/snapshot entry doesn't clear the signal.
+   * turn is thinking-only is one Claude is still working on. Only turns carrying `message` update
+   * either flag, so a trailing bookkeeping entry doesn't clear or corrupt either signal.
    */
   private trackTurnSignals(json: LogEntry, session: Session): void {
     if (json.isSidechain === true) {
       return;
     }
+    // Claude Code writes bookkeeping entries between turns — `attachment` (by far the most
+    // frequent), `last-prompt`, `ai-title`, `queue-operation`, `file-history-snapshot` — that
+    // carry a `type` but no `message`. Without this gate, one of those landing right after a
+    // tool_result overwrites lastEntryType away from 'user', hiding that Claude still owes a
+    // reply for as long as the gap before its next turn lasts. Antigravity turns never carry
+    // `message` either, so this also leaves its lastEntryType/lastEntryIsThinking unset — same
+    // net effect as before, since computeSessionStatus only compares lastEntryType against the
+    // literal 'user', which no Antigravity `type` value ever equals.
+    if (!json.message) {
+      return;
+    }
     if (typeof json.type === 'string') {
       session.lastEntryType = json.type;
     }
-    const blocks = Array.isArray(json.message?.content) ? json.message.content : null;
+    const blocks = Array.isArray(json.message.content) ? json.message.content : null;
     if (blocks) {
       session.lastEntryIsThinking = blocks.some((block) => block?.type === 'thinking');
     }

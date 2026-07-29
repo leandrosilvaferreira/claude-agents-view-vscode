@@ -28,6 +28,31 @@ export function findParentSession(agent: Session, humans: Session[]): Session | 
   return best;
 }
 
+/** Promote a human session to 'working' when a background agent it launched (matched via
+ * findParentSession) is still working. computeSessionStatus only sees same-file subagents
+ * (session.subagents); a cross-file nested agent's liveness never reaches it otherwise, so the
+ * parent can render 'stopped' while its own "Working Agents" group shows that same agent live.
+ *
+ * Matches are collected before any status is mutated: findParentSession's fallback keeps a
+ * human eligible when it's outside PARENT_WINDOW_MS but already 'working' (the `near` check
+ * above), so promoting a parent mid-loop could make it newly eligible for a later, unrelated
+ * agent and change the outcome by iteration order. Two passes keep every match decision based
+ * on the original statuses, so the result is order-independent. */
+export function applyNestedAgentLiveness(sessions: Session[]): void {
+  // Subagent transcripts stamp the parent's own entrypoint (not 'sdk*'), so isAgentSession alone
+  // doesn't filter them out; exclude isSidechain too or one could impersonate a real parent.
+  const humans = sessions.filter((s) => !isAgentSession(s) && !s.isSidechain);
+  const parentsToPromote = new Set<Session>();
+  for (const agent of sessions) {
+    if (!isAgentSession(agent) || agent.status !== 'working') continue;
+    const parent = findParentSession(agent, humans);
+    if (parent) parentsToPromote.add(parent);
+  }
+  for (const parent of parentsToPromote) {
+    parent.status = 'working';
+  }
+}
+
 /** Render a background-agent session as a subagent row under its launcher. */
 export function sessionAsSubagent(agent: Session): SubAgent {
   return {

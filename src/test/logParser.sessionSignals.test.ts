@@ -105,6 +105,30 @@ describe('LogParser session signals', () => {
     expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsThinking).toBe(true);
   });
 
+  it('does not let trailing bookkeeping entries (attachment, last-prompt, ai-title) erase an awaited-reply signal', () => {
+    // Real transcripts write `attachment`/`last-prompt`/`ai-title` entries right after every turn,
+    // before the next assistant turn begins — `attachment` is by far the most frequent of the
+    // three. None of them carry `message`, so none may overwrite lastEntryType away from the last
+    // real conversational turn: a tool_result (role 'user') means Claude still owes a reply, and
+    // that must survive until the next real assistant/user turn, however many bookkeeping lines
+    // land in between.
+    const parser = new LogParser();
+
+    const lines = [
+      {
+        timestamp: '2026-07-17T19:00:00.000Z',
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'ok' }] },
+      },
+      { type: 'attachment' },
+      { type: 'last-prompt' },
+      { type: 'ai-title', aiTitle: 'Some title' },
+    ];
+    fs.appendFileSync(tempFilePath, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+
+    expect(parser.parse(tempFilePath, 'claude-code').lastEntryType).toBe('user');
+  });
+
   it('lets a user rename win over the first prompt and over a later generated title', () => {
     // Claude Code records a rename as its own `type: 'custom-title'` entry and keeps showing that
     // name for the session. Since a generated `ai-title` can land afterwards, plain assignment

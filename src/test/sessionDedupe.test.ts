@@ -6,6 +6,7 @@ import {
   isAgentSession,
   findParentSession,
   sessionAsSubagent,
+  applyNestedAgentLiveness,
 } from '../sessionDedupe';
 import { Session } from '../types';
 
@@ -215,5 +216,76 @@ describe('sessionAsSubagent', () => {
       model: 'claude-opus-4-7',
       name: 'Review for security',
     });
+  });
+});
+
+describe('applyNestedAgentLiveness', () => {
+  // computeSessionStatus only sees same-file subagents (session.subagents); a background agent
+  // in its own transcript is invisible to it. Without this, a launcher session can render
+  // 'stopped' while its own "Working Agents" group (fed from the separate nestedAgents match)
+  // shows that same agent still working — a visibly contradictory tree row.
+  it('promotes a stopped parent to working when its matched background agent is still working', () => {
+    const parent = makeSession({ id: 'parent', status: 'stopped', entrypoint: 'claude-vscode' });
+    const agent = makeSession({
+      id: 'agent',
+      status: 'working',
+      entrypoint: 'sdk-py',
+      projectPath: parent.projectPath,
+      gitBranch: parent.gitBranch,
+      lastInteractionTime: parent.lastInteractionTime,
+    });
+
+    applyNestedAgentLiveness([parent, agent]);
+
+    expect(parent.status).toBe('working');
+  });
+
+  it('leaves the parent stopped when its matched agent already finished', () => {
+    const parent = makeSession({ id: 'parent', status: 'stopped', entrypoint: 'claude-vscode' });
+    const agent = makeSession({
+      id: 'agent',
+      status: 'stopped',
+      entrypoint: 'sdk-py',
+      projectPath: parent.projectPath,
+      gitBranch: parent.gitBranch,
+      lastInteractionTime: parent.lastInteractionTime,
+    });
+
+    applyNestedAgentLiveness([parent, agent]);
+
+    expect(parent.status).toBe('stopped');
+  });
+
+  it('does not let a sidechain pseudo-session steal the parent promotion from the real human session', () => {
+    // Regression: subagent transcripts share the parent's entrypoint ('claude-vscode'), so
+    // isAgentSession alone doesn't filter them out of the candidate-parent list. A sidechain
+    // pseudo-session that out-ranks the real human via isMoreRelevant (e.g. more recent
+    // lastInteractionTime) could get chosen as the working agent's "parent" instead.
+    const human = makeSession({
+      id: 'human',
+      status: 'stopped',
+      entrypoint: 'claude-vscode',
+      lastInteractionTime: 10_000,
+    });
+    const sidechain = makeSession({
+      id: 'sidechain',
+      status: 'stopped',
+      entrypoint: 'claude-vscode',
+      isSidechain: true,
+      lastInteractionTime: 20_000, // more recent than human -> would out-rank it via isMoreRelevant
+    });
+    const agent = makeSession({
+      id: 'agent',
+      status: 'working',
+      entrypoint: 'sdk-py',
+      projectPath: human.projectPath,
+      gitBranch: human.gitBranch,
+      lastInteractionTime: 10_000,
+    });
+
+    applyNestedAgentLiveness([human, sidechain, agent]);
+
+    expect(human.status).toBe('working');
+    expect(sidechain.status).toBe('stopped');
   });
 });

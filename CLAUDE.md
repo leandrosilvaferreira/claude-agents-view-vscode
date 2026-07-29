@@ -134,8 +134,10 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
 - **nameExtractor.ts** — derives the session title from the first real user prompt,
   skipping slash-command scaffolding and `isMeta` turns.
-- **sessionDedupe.ts** — pure dedupe key, stable relevance ranking, and
-  background-agent → launcher matching.
+- **sessionDedupe.ts** — pure dedupe key, stable relevance ranking,
+  background-agent → launcher matching, and `applyNestedAgentLiveness` (promotes a launcher to
+  'working' when its matched nested agent still is, since `computeSessionStatus` only sees
+  same-file subagents).
 - **treeItems.ts** — the `vscode.TreeItem` subclasses (Brand/Session/SubAgentGroup/
   SubAgent/Message) + model-badge and relative-time formatting.
 - **types.ts** — the `Session` and `SubAgent` domain shapes.

@@ -7,6 +7,7 @@ import { LogParser } from './logParser';
 import { scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
 import { assembleVisibleSessions } from './sessionAssembly';
+import { applyNestedAgentLiveness } from './sessionDedupe';
 import { computeSessionStatus, getOpenLogFiles } from './sessionActivity';
 import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
 import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible } from './claudeCompat';
@@ -119,10 +120,9 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     if (!element) {
       return this.getRootItems();
     } else if (element instanceof BrandTreeItem) {
-      // Level 2: Sessions under Brand
-      const items = element.sessions
-        .sort((a, b) => b.lastInteractionTime - a.lastInteractionTime)
-        .map((session) => new SessionTreeItem(session));
+      // Level 2: Sessions under Brand. Order (working sessions first, most-recent-first within
+      // each group) is already decided by assembleVisibleSessions() — don't re-sort here.
+      const items = element.sessions.map((session) => new SessionTreeItem(session));
       return items;
     } else if (element instanceof SessionTreeItem) {
       // Level 3: Working Agents / Completed Agents folders
@@ -329,10 +329,15 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   private async updateActiveStatuses(): Promise<void> {
     try {
       const openFiles = await getOpenLogFiles(this.homeDir);
+      const sessions = Array.from(this.sessions.values());
 
-      for (const session of this.sessions.values()) {
+      for (const session of sessions) {
         session.status = computeSessionStatus(session, openFiles);
       }
+      // computeSessionStatus only sees same-file subagents; fold in cross-file nested agents
+      // (background agents in their own transcript, matched by project+branch) so a launcher
+      // doesn't render 'stopped' while its own "Working Agents" group shows a live child.
+      applyNestedAgentLiveness(sessions);
     } catch (err) {
       logDebug(`SessionTreeDataProvider: updateActiveStatuses() failed: ${String(err)}`);
     }
