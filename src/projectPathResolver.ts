@@ -120,6 +120,8 @@ export class ProjectPathResolver {
       // `path.dirname` returns the root unchanged once it reaches it ('/' on POSIX, 'C:\' on
       // Windows), so the loop must stop at the parsed root or it spins forever — and this runs
       // synchronously on the extension host thread.
+      // `current.length > 1` is NOT redundant next to that check: a relative path parses to a
+      // root of '' and bottoms out at '.', which the root comparison alone never catches.
       while (current && current.length > 1 && current !== path.parse(current).root) {
         if (
           fs.existsSync(path.join(current, '.git')) ||
