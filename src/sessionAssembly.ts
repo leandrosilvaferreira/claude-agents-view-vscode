@@ -54,5 +54,14 @@ export function assembleVisibleSessions(all: Session[], activePaths: string[], n
       dedupeMap.set(key, session);
     }
   }
-  return { topLevel: Array.from(dedupeMap.values()), nestedAgents };
+
+  // Working sessions render before inactive ones — a live subagent can outlast its parent's
+  // last write, so recency alone would bury an actively-working session under an idle one.
+  // Full total order (id as final tiebreak) so the result never depends on sort stability.
+  const topLevel = Array.from(dedupeMap.values()).sort((a, b) => {
+    if ((a.status === 'working') !== (b.status === 'working')) return a.status === 'working' ? -1 : 1;
+    if (a.lastInteractionTime !== b.lastInteractionTime) return b.lastInteractionTime - a.lastInteractionTime;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  return { topLevel, nestedAgents };
 }

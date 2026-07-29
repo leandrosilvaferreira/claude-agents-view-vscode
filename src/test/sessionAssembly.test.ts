@@ -95,4 +95,24 @@ describe('assembleVisibleSessions', () => {
     expect(topLevel.map((s) => s.id)).toEqual(['human']);
     expect(nestedAgents.get('human')?.map((a) => a.id)).toEqual(['agent']);
   });
+
+  it('orders a less-recent working session before a more-recent stopped session', () => {
+    const stoppedRecent = makeSession({
+      id: 'stopped-recent',
+      status: 'stopped',
+      lastInteractionTime: NOW - 5 * 60 * 1000,
+    });
+    const workingOld = makeSession({ id: 'working-old', status: 'working', lastInteractionTime: NOW - 20 * 60 * 1000 });
+    // Input order deliberately puts the more-recent stopped session first, so the assertion
+    // only passes if working-first grouping actually reorders it (not by accident of input order).
+    const { topLevel } = assembleVisibleSessions([stoppedRecent, workingOld], [], NOW);
+    expect(topLevel.map((s) => s.id)).toEqual(['working-old', 'stopped-recent']);
+  });
+
+  it('keeps most-recent-first within the same status group', () => {
+    const olderWorking = makeSession({ id: 'w-older', status: 'working', lastInteractionTime: NOW - 10 * 60 * 1000 });
+    const recentWorking = makeSession({ id: 'w-recent', status: 'working', lastInteractionTime: NOW - 1 * 60 * 1000 });
+    const { topLevel } = assembleVisibleSessions([olderWorking, recentWorking], [], NOW);
+    expect(topLevel.map((s) => s.id)).toEqual(['w-recent', 'w-older']);
+  });
 });

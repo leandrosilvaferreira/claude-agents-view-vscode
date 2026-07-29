@@ -47,7 +47,10 @@ export class SessionTreeItem extends vscode.TreeItem {
     // it legitimately runs its own model, often different from the launcher's.
     const isAgentSession = session.entrypoint?.startsWith('sdk') ?? false;
 
-    const relativeTime = this.formatRelativeTime(session.lastInteractionTime);
+    // A subagent writes to its own file, so the parent transcript's clock freezes while it
+    // works — a stale "Xm ago" next to a live spinner misreads as stalled, so show "working" instead.
+    const relativeTime =
+      session.status === 'working' ? 'working' : this.formatRelativeTime(session.lastInteractionTime);
     const model = formatModel(session.model);
     const agentTag = isAgentSession ? 'agent · ' : '';
     const meta = model
