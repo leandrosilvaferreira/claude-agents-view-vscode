@@ -73,10 +73,15 @@ describe('LogParser project path resolution', () => {
     // filesystem root, so these two tests need a real ancestor directory whose own name is
     // guaranteed clean (no '_'/' '/accents) — os.tmpdir() itself can contain a literal '_' on
     // macOS (e.g. /var/folders/xx/xxxxx_xxxx/T), which would contaminate the very ambiguity
-    // being tested. '/tmp' is always plain alnum + '/'.
-    const cleanRoot = '/tmp';
+    // being tested. '/tmp' is always plain alnum + '/' on POSIX, but doesn't exist on Windows
+    // (and mkdtempSync won't create it), so there we fall back to os.tmpdir() and skip only when
+    // that root is itself dirty — it sits under the user profile, which *may* carry a space
+    // ("C:\Users\John Doe\...") but usually doesn't. Gating on the root instead of on the platform
+    // keeps the coverage on every Windows box where these tests can still prove anything.
+    const cleanRoot = process.platform === 'win32' ? os.tmpdir() : '/tmp';
+    const rootIsAmbiguous = /[^A-Za-z0-9:\\/]/.test(cleanRoot);
 
-    it('recovers a real folder whose name is itself hyphenated', () => {
+    it.skipIf(rootIsAmbiguous)('recovers a real folder whose name is itself hyphenated', () => {
       const realProjectRoot = fs.mkdtempSync(path.join(cleanRoot, 'decode-test-'));
       const realProjectDir = path.join(realProjectRoot, 'claude-agents-view-vscode');
       fs.mkdirSync(realProjectDir);
@@ -94,23 +99,26 @@ describe('LogParser project path resolution', () => {
       }
     });
 
-    it('cannot recover an underscore in the real folder name (known heuristic limitation, fixed by the cwd override above)', () => {
-      const realProjectRoot = fs.mkdtempSync(path.join(cleanRoot, 'decode-test-'));
-      const realProjectDir = path.join(realProjectRoot, 'aia_harness');
-      fs.mkdirSync(realProjectDir);
+    it.skipIf(rootIsAmbiguous)(
+      'cannot recover an underscore in the real folder name (known heuristic limitation, fixed by the cwd override above)',
+      () => {
+        const realProjectRoot = fs.mkdtempSync(path.join(cleanRoot, 'decode-test-'));
+        const realProjectDir = path.join(realProjectRoot, 'aia_harness');
+        fs.mkdirSync(realProjectDir);
 
-      try {
-        const encodedName = realProjectDir.replace(/[^A-Za-z0-9]/g, '-');
-        const parser = new LogParser(claudeProjectsDir);
-        const missingFilePath = path.join(claudeProjectsDir, encodedName, 'session.jsonl');
+        try {
+          const encodedName = realProjectDir.replace(/[^A-Za-z0-9]/g, '-');
+          const parser = new LogParser(claudeProjectsDir);
+          const missingFilePath = path.join(claudeProjectsDir, encodedName, 'session.jsonl');
 
-        const session = parser.parse(missingFilePath, 'claude-code');
+          const session = parser.parse(missingFilePath, 'claude-code');
 
-        // '_' and '/' both collapsed to '-' during encoding, so the guess can't tell them apart.
-        expect(session.projectPath).not.toBe(realProjectDir);
-      } finally {
-        fs.rmSync(realProjectRoot, { recursive: true, force: true });
-      }
-    });
+          // '_' and '/' both collapsed to '-' during encoding, so the guess can't tell them apart.
+          expect(session.projectPath).not.toBe(realProjectDir);
+        } finally {
+          fs.rmSync(realProjectRoot, { recursive: true, force: true });
+        }
+      },
+    );
   });
 });

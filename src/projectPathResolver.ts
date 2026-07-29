@@ -56,6 +56,9 @@ export class ProjectPathResolver {
    * path separator, making it ambiguous to decode. Walks the file system to disambiguate.
    */
   public decodeClaudeProjectPath(projectDir: string): string {
+    // On Windows the encoded name won't start with '-' (a POSIX cwd always does, since it
+    // starts with '/'), so this guard falls through unchanged. Harmless: `detectClaudeCodeProjectPath`
+    // always prefers the real `cwd` field, which self-corrects this on the first parsed line.
     if (!projectDir.startsWith('-')) return projectDir;
     const cached = this.decodedPathCache.get(projectDir);
     if (cached !== undefined) return cached;
@@ -114,7 +117,10 @@ export class ProjectPathResolver {
   private findProjectRoot(filePath: string): string {
     try {
       let current = path.dirname(filePath);
-      while (current && current !== '/' && current.length > 1) {
+      // `path.dirname` returns the root unchanged once it reaches it ('/' on POSIX, 'C:\' on
+      // Windows), so the loop must stop at the parsed root or it spins forever — and this runs
+      // synchronously on the extension host thread.
+      while (current && current.length > 1 && current !== path.parse(current).root) {
         if (
           fs.existsSync(path.join(current, '.git')) ||
           fs.existsSync(path.join(current, '.claude')) ||

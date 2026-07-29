@@ -12,15 +12,15 @@ Lightweight VS Code / Antigravity sidebar that monitors your active **Claude Cod
 - **Subagents** — split into _Working_ and _Completed_, each showing its name, task, and **model**.
 - **Model badges** (Claude Code): session model from the assistant stream (e.g. `sonnet-5`), and each subagent's own model from the `Agent` tool (e.g. `sonnet`), falling back to the session model when inherited. _(Antigravity logs carry no model info, so no badge there.)_
 - **Real-time updates** via file watchers, plus a 15s safety refresh.
-- **Active detection** using `lsof` (open log file) with an mtime fallback.
+- **Active detection** via heuristics (recent writes, a pending reply, live subagents) — `lsof` is also checked on macOS/Linux but rarely finds anything, and is skipped entirely on Windows.
 - **Startup delay** — waits ~10s on activation, showing a progress bar and loading state, so it doesn't compete with Claude Code for the log files while it boots.
 - **Global on/off toggle** — an eye icon in the view title. Persisted as an application-scoped setting, so disabling it stops monitoring across **every** window/instance.
 
 ## Requirements
 
 - VS Code or Antigravity **≥ 1.90** (Antigravity 1.107.0 base is compatible).
-- macOS or Linux (uses `lsof` for active-session detection).
-- Reads `~/.claude/projects/**/*.jsonl` and `~/.gemini/antigravity-ide/brain/**/transcript.jsonl`.
+- macOS, Linux, or Windows.
+- Reads `~/.claude/projects/**/*.jsonl` and `~/.gemini/antigravity-ide/brain/**/transcript.jsonl` (`%USERPROFILE%` in place of `~` on Windows).
 
 ## Claude Code compatibility
 

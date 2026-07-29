@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { computeSessionStatus } from '../sessionActivity';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { exec } from 'child_process';
+import { computeSessionStatus, getOpenLogFiles } from '../sessionActivity';
 import { Session } from '../types';
+
+vi.mock('child_process', () => ({
+  exec: vi.fn((_command: string, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
+    callback(null, '', '');
+  }),
+}));
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 const THIRTY_ONE_MINUTES = 31 * 60 * 1000;
@@ -74,5 +81,34 @@ describe('computeSessionStatus', () => {
     const open = new Set([stale.logFilePath]);
 
     expect(computeSessionStatus(stale, open)).toBe('working');
+  });
+});
+
+describe('getOpenLogFiles', () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    vi.mocked(exec).mockClear();
+  });
+
+  it('resolves to an empty set and never spawns a subprocess on win32 (no lsof there)', async () => {
+    // Regression test: lsof doesn't exist on Windows, so getOpenLogFiles must short-circuit
+    // before ever building a command or shelling out — spawning a doomed subprocess on every
+    // refresh would be wasted work at best.
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+
+    const result = await getOpenLogFiles('/home/user');
+
+    expect(result).toEqual(new Set());
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  it('shells out to lsof on non-Windows platforms', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+
+    await getOpenLogFiles('/home/user');
+
+    expect(exec).toHaveBeenCalledTimes(1);
   });
 });

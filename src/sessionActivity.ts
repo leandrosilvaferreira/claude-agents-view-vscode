@@ -8,7 +8,8 @@ import { logDebug } from './logger';
  *
  * `lsof` is the only positive proof, but neither Claude Code nor Antigravity keeps the transcript
  * file descriptor open between appends — in practice it returns nothing, so everything falls to
- * the heuristics below. The old "modified in the last 30s" fallback alone marked a session
+ * the heuristics below. On Windows `lsof` doesn't exist at all, so there the heuristics are the
+ * only path. The old "modified in the last 30s" fallback alone marked a session
  * stopped during any quiet stretch: a backgrounded agent can run for minutes without the parent
  * transcript gaining a single line, which is exactly when the user is watching it work.
  *
@@ -38,8 +39,15 @@ export function computeSessionStatus(session: Session, openFiles: Set<string>): 
 }
 
 /** Set of transcript files currently held open, per `lsof`. Scoped to ~/.claude and ~/.gemini to
- * avoid a full-system scan. Resolves to an empty set on any error (the heuristics cover the rest). */
+ * avoid a full-system scan. Resolves to an empty set on any error (the heuristics cover the rest),
+ * and on Windows, where `lsof` does not exist. */
 export function getOpenLogFiles(homeDir: string): Promise<Set<string>> {
+  // Windows has no `lsof`. Rather than spawn a doomed subprocess on every refresh, skip straight
+  // to the empty set — `computeSessionStatus` treats that exactly like the (already normal) case
+  // where lsof returns nothing, and its heuristics carry the whole detection there.
+  if (process.platform === 'win32') {
+    return Promise.resolve(new Set());
+  }
   return new Promise((resolve) => {
     const openFiles = new Set<string>();
 

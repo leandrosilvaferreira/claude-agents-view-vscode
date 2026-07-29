@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as path from 'path';
 import { assembleVisibleSessions } from '../sessionAssembly';
 import { Session } from '../types';
 
@@ -68,7 +69,11 @@ describe('assembleVisibleSessions', () => {
   it('scopes Claude Code sessions to the active workspace folders', () => {
     const inside = makeSession({ id: 'in', projectPath: '/Users/dev/repo/wt/a', gitBranch: 'a' });
     const outside = makeSession({ id: 'out', projectPath: '/Users/dev/other', gitBranch: 'b' });
-    const { topLevel } = assembleVisibleSessions([inside, outside], ['/users/dev/repo'], NOW);
+    // sessionTreeDataProvider.ts always normalizes+lowercases activePaths before calling in;
+    // mirror that here instead of a raw literal, or this assertion silently breaks on Windows
+    // (path.normalize turns '/' into '\' there, so an un-normalized literal never matches again).
+    const activePath = path.normalize('/Users/dev/repo').toLowerCase();
+    const { topLevel } = assembleVisibleSessions([inside, outside], [activePath], NOW);
     expect(topLevel.map((s) => s.id)).toEqual(['in']);
   });
 

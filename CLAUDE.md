@@ -116,18 +116,20 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   view + 5 commands, gates monitoring on the `claudeAgentsMonitor.enabled` setting,
   delays the first scan ~10s so it doesn't race Claude Code for the log files.
 - **sessionTreeDataProvider.ts** — orchestrator + `TreeDataProvider`: owns the session
-  Map, file watchers, 15s refresh timer, `lsof` active-status detection, and calls
-  dedupe + background-agent nesting before feeding the tree.
+  Map, file watchers, 15s refresh timer, `lsof` active-status detection (macOS/Linux
+  only), and calls dedupe + background-agent nesting before feeding the tree.
 - **sessionScanner.ts** — discovers Claude (`~/.claude/projects/**/*.jsonl`) and
   Antigravity (`~/.gemini/.../transcript.jsonl`) log files. Pure, never throws.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads
   only appended bytes); builds a `Session`, delegates title, subagent and project-path
   extraction.
 - **projectPathResolver.ts** — works out which project a transcript belongs to: Claude
-  Code's `cwd` (preferred) or its ambiguous encoded directory name, Antigravity's prose
-  metadata / tool-call `Cwd`, else walks up for a project marker.
-- **sessionActivity.ts** — decides whether a session is still running (`lsof`, recent
-  write, user turn awaiting a reply, thinking-only last turn, or live subagents).
+  Code's `cwd` (preferred) or its ambiguous, POSIX-shaped encoded directory name (raw
+  name on Windows until `cwd` self-corrects it), Antigravity's prose metadata /
+  tool-call `Cwd`, else walks up for a project marker.
+- **sessionActivity.ts** — decides whether a session is still running (`lsof` on
+  macOS/Linux only, recent write, user turn awaiting a reply, thinking-only last turn,
+  or live subagents).
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
 - **nameExtractor.ts** — derives the session title from the first real user prompt,
