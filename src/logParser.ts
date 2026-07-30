@@ -5,6 +5,7 @@ import { Session, SubAgent } from './types';
 import { extractRenamedTitle, extractSessionName } from './nameExtractor';
 import { ProjectPathResolver } from './projectPathResolver';
 import { detectSubagents } from './subagentDetector';
+import { enrichSubagentMetadata } from './subagentMetadata';
 import { LogEntry } from './transcriptEntry';
 
 // Re-exported so existing importers (e.g. subagentDetector) keep resolving LogEntry from here.
@@ -89,6 +90,9 @@ export class LogParser {
       }
 
       session.subagents = Array.from(currentSubagents.values());
+      // Runs once per parseNewLines() call (i.e. only when this file actually grew), and only
+      // reads a sidecar for subagents still missing a name/model — never per render.
+      enrichSubagentMetadata(session);
       session.lastInteractionTime = stats.mtimeMs;
     } finally {
       fs.closeSync(fd);

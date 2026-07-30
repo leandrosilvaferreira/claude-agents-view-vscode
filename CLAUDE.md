@@ -132,6 +132,9 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   or live subagents).
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
+- **subagentMetadata.ts** — fills a detected subagent's real name/model from the
+  `agent-<id>.meta.json` sidecar, joined on `toolUseId`; looks in both the transcript's
+  own directory and the one `projectPath` encodes to (they differ inside a worktree).
 - **nameExtractor.ts** — derives the session title from the first real user prompt,
   skipping slash-command scaffolding and `isMeta` turns.
 - **sessionDedupe.ts** — pure dedupe key, stable relevance ranking,
