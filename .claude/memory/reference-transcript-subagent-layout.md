@@ -10,6 +10,11 @@ Real on-disk layout under `~/.claude/projects/<encoded-project>/`:
 - Session transcript: `<session-id>.jsonl`
 - Subagent transcripts: `<session-id>/subagents/agent-<id>.jsonl` — same
   `entrypoint` as the parent (e.g. `claude-vscode`), NOT `sdk*`.
+- Next to each one, a `agent-<id>.meta.json` sidecar (1:1, ~200 bytes) holding
+  `agentType`, `description`, `toolUseId`, `spawnDepth`, `model`. `toolUseId`
+  joins to `SubAgent.id` (both are the launching `tool_use` block's id); the
+  filename's id is an unrelated internal one, so never join on the filename.
+  `subagentMetadata.ts` uses this to fill in the real agent name and model.
 - Background agents launched by `/security-review` and similar: their own
   top-level `<uuid>.jsonl` with `entrypoint: sdk-py`.
 - A session that enters a git worktree leaves its main transcript in the **base**
