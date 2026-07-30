@@ -6,4 +6,6 @@
 
 - [Bookkeeping entries carry no `message`](architecture-transcript-bookkeeping-entries.md) — `attachment`/`last-prompt`/`queue-operation`/`ai-title` trail every real turn; activity heuristics must gate on `message`, not `type`.
 
+- [Why tsconfig pins `types: ["node"]`](architecture-types-node-pin-under-nodenext.md) — an ESM-flagged transitive `@types/chai` kills global `@types` inclusion under NodeNext; looks like a broken `@types/node` but isn't.
+
 - [Subagent transcript layout on disk](reference-transcript-subagent-layout.md) — subagents live in `<session-id>/subagents/agent-*.jsonl`; `scanClaudeSubSessions` looks in a `sessions/` dir that never exists.
