@@ -20,11 +20,15 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v7 for both: the node24 action runtime landed in v5, so v4 was being force-migrated
+      # off its deprecated node20 runtime on every run. Neither v7 breaking change applies
+      # here — checkout's fork-PR guard only affects pull_request_target/workflow_run, and
+      # setup-node's dropped NODE_AUTH_TOKEN fallback only affects registry-url auth.
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
