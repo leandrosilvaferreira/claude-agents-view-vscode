@@ -2,7 +2,7 @@
   "name": "claude-agents-monitor",
   "displayName": "Claude & Antigravity Agent Monitor",
   "description": "Lightweight VS Code sidebar monitor for active Claude Code and Google Antigravity sessions and subagents.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "leandrosilvaferreira",
   "license": "Apache-2.0",
   "icon": "resources/icon.png",
