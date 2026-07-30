@@ -238,7 +238,7 @@ export class LogParser {
   private createEmptySession(filePath: string, type: 'claude-code' | 'antigravity'): Session {
     const fileBasename = path.basename(filePath, '.jsonl');
 
-    let projectDir = '';
+    let projectDir: string;
     if (type === 'claude-code') {
       const relative = path.relative(this.claudeProjectsPath, filePath);
       projectDir = relative.split(path.sep)[0] || '';
