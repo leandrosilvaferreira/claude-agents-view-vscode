@@ -202,7 +202,7 @@ describe('findParentSession', () => {
 });
 
 describe('sessionAsSubagent', () => {
-  it('carries the agent session status and its own model', () => {
+  it('carries the agent session status and its own model, and puts the session title in task, not name', () => {
     const agent = makeSession({
       id: 'agent',
       status: 'working',
@@ -214,8 +214,27 @@ describe('sessionAsSubagent', () => {
       id: 'agent',
       status: 'working',
       model: 'claude-opus-4-7',
-      name: 'Review for security',
+      name: 'Agent',
+      task: 'Review for security',
     });
+  });
+
+  // Regression: a background-agent session has no field distinct from its own derived title, so
+  // reusing sessionTitle for `name` too made the tree row's bold label repeat its own description
+  // verbatim (e.g. "Review dependency and configuration updates for security" as both). name must
+  // always be the generic placeholder here, regardless of whether a title was captured.
+  it('never uses the session title as name, even when one is captured', () => {
+    const agent = makeSession({ id: 'agent', sessionTitle: 'Review dependency updates for security' });
+    const sub = sessionAsSubagent(agent);
+    expect(sub.name).toBe('Agent');
+    expect(sub.name).not.toBe(sub.task);
+  });
+
+  it('falls back to the session id for task when no title was captured yet', () => {
+    const agent = makeSession({ id: 'agent-untitled', sessionTitle: '' });
+    const sub = sessionAsSubagent(agent);
+    expect(sub.name).toBe('Agent');
+    expect(sub.task).toBe('agent-untitled');
   });
 });
 

@@ -53,11 +53,20 @@ export function applyNestedAgentLiveness(sessions: Session[]): void {
   }
 }
 
-/** Render a background-agent session as a subagent row under its launcher. */
+/** Render a background-agent session as a subagent row under its launcher.
+ *
+ * `name` is always the generic 'Agent' placeholder, never `agent.sessionTitle`: unlike a
+ * Task-tool subagent (which carries a real `name`/`description` pair from its launch block) or
+ * a nested subagent with a `.meta.json` sidecar (`agentType`/`description`), a background-agent
+ * *session* has no field distinct from its own title — nameExtractor derives that title from the
+ * same prompt `task` already shows. Using it for `name` too just repeats the task text as both
+ * the row's bold label and its description, which reads as a rendering bug rather than two
+ * pieces of information. 'Agent' matches subagentDetector's own fallback for the same "no real
+ * name available" case, so both subagent flavors degrade to the same generic label. */
 export function sessionAsSubagent(agent: Session): SubAgent {
   return {
     id: agent.id,
-    name: agent.sessionTitle || 'Agent',
+    name: 'Agent',
     task: agent.sessionTitle || agent.id,
     status: agent.status,
     model: agent.model,
