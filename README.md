@@ -9,10 +9,11 @@ Lightweight VS Code / Antigravity sidebar that monitors your active **Claude Cod
 
 - **Sessions grouped by tool** — Claude Code and Google Antigravity under separate brand nodes.
 - **Per session**: project, git branch, last-active time, session title (first user prompt), and the **LLM model** in use.
-- **Subagents** — split into _Working_ and _Completed_, each showing its name, task, and **model**.
-- **Model badges** (Claude Code): session model from the assistant stream (e.g. `sonnet-5`), and each subagent's own model from the `Agent` tool (e.g. `sonnet`), falling back to the session model when inherited. _(Antigravity logs carry no model info, so no badge there.)_
+- **Working sessions surface first** — sessions still working sort to the top of the list, ahead of idle ones, and show `working` in place of a relative timestamp (a subagent writes to its own log file, so its parent session's last-write clock can go quiet while the subagent is still live).
+- **Subagents** — split into _Working_ and _Completed_, each row showing its real name and model (e.g. `explorer-agent · haiku`), read from the metadata Claude Code writes alongside each subagent's transcript, plus its task.
+- **Model badges** (Claude Code): session model from the assistant stream (e.g. `sonnet-5`), and each subagent's own model, falling back to the session model when inherited. _(Antigravity logs carry no model info, so no badge there.)_
 - **Real-time updates** via file watchers, plus a 15s safety refresh.
-- **Active detection** via heuristics (recent writes, a pending reply, live subagents) — `lsof` is also checked on macOS/Linux but rarely finds anything, and is skipped entirely on Windows.
+- **Active detection** — a session is marked active on a recent write, a reply it still owes, a long _thinking_ turn, or while any of its subagents — including a background agent it launched that runs in its own log file — are still working. `lsof` is also checked on macOS/Linux as a secondary signal (it rarely finds anything, since the log file's descriptor isn't held open between appends), and is skipped entirely on Windows.
 - **Startup delay** — waits ~10s on activation, showing a progress bar and loading state, so it doesn't compete with Claude Code for the log files while it boots.
 - **Global on/off toggle** — an eye icon in the view title. Persisted as an application-scoped setting, so disabling it stops monitoring across **every** window/instance.
 
@@ -25,42 +26,36 @@ Lightweight VS Code / Antigravity sidebar that monitors your active **Claude Cod
 ## Claude Code compatibility
 
 The parser depends on the Claude Code transcript format, which can change between releases.
-Last validated against **Claude Code 2.1.218** (`KNOWN_COMPATIBLE_CLAUDE_VERSION` in
-[src/claudeCompat.ts](src/claudeCompat.ts)). Claude Code stamps its `version` on every transcript
-line; when a newer one appears in the logs the extension shows a one-time warning so the format can
-be re-checked. After validating against a new release, bump that constant.
+Last validated against **Claude Code 2.1.220**. Claude Code stamps a `version` field on every
+transcript line; when a newer one shows up in your logs, the extension shows a one-time
+warning so you know the parser hasn't been re-checked against it yet. See
+[docs/DEVELOPMENT.md](https://github.com/leandrosilvaferreira/claude-agents-view-vscode/blob/main/docs/DEVELOPMENT.md#claude-code-compatibility)
+for how this is tracked.
 
 ## Install
 
-### From the extension store
+### From the extension store (recommended)
 
 Antigravity (and VSCodium, Gitpod, Cursor, Windsurf) ships the
 [Open VSX Registry](https://open-vsx.org): open the **Extensions** view, search for
-`Agent Monitor`, and install. Maintainers: see [docs/PUBLISHING.md](docs/PUBLISHING.md).
+`Agent Monitor`, and install.
 
-### From a local `.vsix`
+### From a downloaded `.vsix`
 
-Build the package:
-
-```bash
-npm install
-npm run package        # → npx @vscode/vsce package --no-dependencies
-```
-
-Install it into **Antigravity** via CLI:
+Grab the `.vsix` from the
+[latest release](https://github.com/leandrosilvaferreira/claude-agents-view-vscode/releases/latest),
+then install it:
 
 ```bash
-antigravity-ide --install-extension claude-agents-monitor-0.1.0.vsix --force
+# Antigravity
+antigravity-ide --install-extension claude-agents-monitor-*.vsix --force
+
+# VS Code
+code --install-extension claude-agents-monitor-*.vsix --force
 ```
 
 …or via the screen: **Extensions** view → `…` (top-right menu) → **Install from VSIX…** →
-pick `claude-agents-monitor-0.1.0.vsix`.
-
-…or into plain **VS Code**:
-
-```bash
-code --install-extension claude-agents-monitor-0.1.0.vsix --force
-```
+pick the file you downloaded.
 
 Then reload the window (Command Palette → _Developer: Reload Window_). The 🤖 **Agent Monitor**
 icon appears in the activity bar.
@@ -80,26 +75,15 @@ To uninstall: `antigravity-ide --uninstall-extension leandrosilvaferreira.claude
 - **Open Log File** / **Open Project Folder** are available on each session row (inline icons).
 - Toggle monitoring on/off with the eye icon in the view title.
 
-## Development
-
-```bash
-npm install
-# Run in an Extension Development Host:
-#   press F5 (launch config "Run Extension")
-npm run build          # esbuild bundle → dist/extension.js
-npm test               # vitest
-npm run lint
-```
-
-To rebuild and reinstall after changes, repackage and install with `--force`, then reload the
-window. For a clean upgrade instead of `--force`, bump `version` in `package.json`.
+Want to build or modify the extension instead? See
+[docs/DEVELOPMENT.md](https://github.com/leandrosilvaferreira/claude-agents-view-vscode/blob/main/docs/DEVELOPMENT.md).
 
 ## License
 
-[Apache License 2.0](LICENSE) — Copyright 2026 Leandro Silva Ferreira.
+[Apache License 2.0](https://github.com/leandrosilvaferreira/claude-agents-view-vscode/blob/main/LICENSE) — Copyright 2026 Leandro Silva Ferreira.
 
 Free to use, modify, extend and redistribute, including commercially — **provided you keep
 the attribution**. Section 4 of the License requires every copy or derivative work to retain
-the [NOTICE](NOTICE) file, which credits the original author and links back to this
+the [NOTICE](https://github.com/leandrosilvaferreira/claude-agents-view-vscode/blob/main/NOTICE) file, which credits the original author and links back to this
 repository, to preserve the existing copyright notices, and to state which files were
 changed. Stripping that attribution is a licence violation.
