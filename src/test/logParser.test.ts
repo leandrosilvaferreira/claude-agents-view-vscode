@@ -325,4 +325,84 @@ describe('LogParser', () => {
     expect(session.subagents.length).toBe(2);
     expect(session.subagents[1].status).toBe('working');
   });
+
+  it('recovers a subagent launch line torn mid-write once the writer finishes it', () => {
+    // Regression: a file-watcher tick (or the 15s auto-refresh) can call parse() at the exact
+    // moment Claude Code has only partially flushed a line. The old code advanced lastReadOffset
+    // to fileSize unconditionally, so the torn fragment's bytes were skipped forever — the next
+    // read started mid-JSON and failed again, permanently losing the entry (here, a subagent
+    // launch that would otherwise show the session as still running).
+    const parser = new LogParser();
+
+    const turn1 = {
+      timestamp: '2026-07-17T19:00:00.000Z',
+      gitBranch: 'feature/auth-setup',
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: 'Implement Google OAuth' }] },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(turn1) + '\n');
+
+    const turn2 = {
+      timestamp: '2026-07-17T19:00:01.000Z',
+      type: 'tool_use',
+      name: 'Agent',
+      id: 'toolu_torn_launch',
+      input: { name: 'OAuth Agent', task: 'Review redirect configs' },
+    };
+    const turn2Line = JSON.stringify(turn2) + '\n';
+    // Simulate the watcher catching the write ~40% into the line — no trailing '\n' yet.
+    const tornPrefix = turn2Line.slice(0, Math.floor(turn2Line.length * 0.4));
+    fs.appendFileSync(tempFilePath, tornPrefix);
+
+    let session = parser.parse(tempFilePath, 'claude-code');
+    expect(session.gitBranch).toBe('feature/auth-setup');
+    expect(session.subagents.length).toBe(0);
+
+    // The writer finishes the line.
+    fs.appendFileSync(tempFilePath, turn2Line.slice(tornPrefix.length));
+
+    // Same LogParser instance — its cached offset must have retreated to before the torn
+    // fragment, not past it, for this second call to see the now-complete line.
+    session = parser.parse(tempFilePath, 'claude-code');
+    expect(session.subagents.length).toBe(1);
+    expect(session.subagents[0].name).toBe('OAuth Agent');
+    expect(session.subagents[0].status).toBe('working');
+  });
+
+  it('recovers a line torn inside a multibyte character, using byte offsets not string length', () => {
+    // Locks the Buffer.byteLength(…, 'utf8') requirement: transcripts contain multibyte UTF-8
+    // (accents, emoji). Retreating the offset by a UTF-16 code-unit count instead of a byte count
+    // would land the next read at the wrong byte position — corrupting or re-losing the entry —
+    // even though the plain-ASCII case above would still pass.
+    const parser = new LogParser();
+
+    const turn = {
+      timestamp: '2026-07-17T19:00:01.000Z',
+      type: 'tool_use',
+      name: 'Agent',
+      id: 'toolu_multibyte',
+      input: { name: 'Café Agent ☕', task: 'handle 🚀 emoji across a torn read' },
+    };
+    const fullLine = JSON.stringify(turn) + '\n';
+    const fullBuffer = Buffer.from(fullLine, 'utf8');
+
+    // Cut 2 bytes into the 4-byte UTF-8 encoding of the 🚀 emoji, so the fragment on disk ends
+    // mid-character — a plain string slice couldn't reliably reproduce this (JS strings are
+    // UTF-16), so the cut is computed on the encoded bytes instead.
+    const emojiIndex = fullLine.indexOf('🚀');
+    const byteOffsetOfEmoji = Buffer.byteLength(fullLine.slice(0, emojiIndex), 'utf8');
+    const cutPoint = byteOffsetOfEmoji + 2;
+
+    fs.writeFileSync(tempFilePath, fullBuffer.subarray(0, cutPoint));
+
+    let session = parser.parse(tempFilePath, 'claude-code');
+    expect(session.subagents.length).toBe(0);
+
+    // The writer finishes the line — append the remaining bytes (rest of the emoji + rest of JSON).
+    fs.appendFileSync(tempFilePath, fullBuffer.subarray(cutPoint));
+
+    session = parser.parse(tempFilePath, 'claude-code');
+    expect(session.subagents.length).toBe(1);
+    expect(session.subagents[0].name).toBe('Café Agent ☕');
+  });
 });

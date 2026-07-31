@@ -59,8 +59,7 @@ export class LogParser {
       const { session, lastReadOffset } = cacheEntry;
 
       if (fileSize > lastReadOffset) {
-        this.parseNewLines({ filePath, fileSize, lastReadOffset, session, stats });
-        cacheEntry.lastReadOffset = fileSize;
+        cacheEntry.lastReadOffset = this.parseNewLines({ filePath, fileSize, lastReadOffset, session, stats });
       }
 
       return session;
@@ -69,7 +68,8 @@ export class LogParser {
     }
   }
 
-  private parseNewLines(ctx: NewLinesContext): void {
+  /** Returns the byte offset the next read should resume from. */
+  private parseNewLines(ctx: NewLinesContext): number {
     const { filePath, fileSize, lastReadOffset, session, stats } = ctx;
     const fd = fs.openSync(filePath, 'r');
     const bufferSize = fileSize - lastReadOffset;
@@ -78,7 +78,17 @@ export class LogParser {
     try {
       fs.readSync(fd, buffer, 0, bufferSize, lastReadOffset);
       const newContent = buffer.toString('utf8');
+
+      // Claude Code writes one line at a time; a chunk read mid-write can end partway through the
+      // line currently being flushed (no trailing '\n' yet). That fragment must not be parsed now:
+      // it either fails JSON.parse (silently dropped below) or, worse, could coincidentally parse
+      // as something else — and since the offset would already sit past it, the real entry is lost
+      // forever, because the next read starts after it, mid-JSON, and never resyncs. So hold the
+      // fragment back and don't advance the offset past it, leaving it to be re-read whole once the
+      // writer finishes the line.
+      const endsWithNewline = newContent.endsWith('\n');
       const lines = newContent.split('\n');
+      const incompleteTail = endsWithNewline ? '' : (lines.pop() ?? '');
 
       const currentSubagents = new Map<string, SubAgent>();
       for (const sub of session.subagents) {
@@ -94,6 +104,11 @@ export class LogParser {
       // reads a sidecar for subagents still missing a name/model — never per render.
       enrichSubagentMetadata(session);
       session.lastInteractionTime = stats.mtimeMs;
+
+      // Byte length, not `.length` (UTF-16 code units): transcripts carry multibyte UTF-8 (accented
+      // text, emoji), so a char-counted retreat would land the next read mid-character instead of
+      // at the start of the held-back fragment.
+      return fileSize - Buffer.byteLength(incompleteTail, 'utf8');
     } finally {
       fs.closeSync(fd);
     }
