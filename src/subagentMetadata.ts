@@ -7,14 +7,22 @@ interface SidecarMetadata {
   agentType?: string;
   model?: string;
   toolUseId?: string;
+  agentId?: string;
 }
 
 /**
  * Enrich subagents that still show the 'Agent' placeholder name or have no model, using the
  * `agent-<id>.meta.json` sidecar Claude Code writes next to each subagent transcript. The
- * sidecar's `toolUseId` is the same id subagentDetector uses as `SubAgent.id` (both come from
- * the launching `tool_use` block's own `id`), so it is a direct join key — no need to parse the
- * sidecar's filename, which carries an unrelated internal agent id.
+ * sidecar's `toolUseId` is the id of the launching `tool_use` block, fixed forever at launch
+ * time — so the join key is `sub.launchId ?? sub.id`, not just `sub.id`: a SendMessage resume
+ * (subagentDetector.ts's detectSendMessageResume) re-keys `sub.id` to its OWN tool_use id and
+ * stashes the original launch id in `sub.launchId` precisely so this join keeps working after a
+ * resume — without it, a resumed subagent would silently stop being enrichable.
+ *
+ * The sidecar filename's `<id>` is also read now (into `SidecarMetadata.agentId`) — an earlier
+ * version of this comment called it "an unrelated internal agent id"; that was wrong. It is the
+ * raw agentId Claude Code assigns the subagent, and the other form SendMessage's `to` can carry
+ * when the launch never set an explicit `name` (see subagentDetector.ts's findSubagentEntryByTarget).
  *
  * A session that entered a git worktree keeps its MAIN transcript in the base project's
  * ~/.claude/projects/<encoded-base> directory, while its subagent sidecars land under the
@@ -38,7 +46,7 @@ export function enrichSubagentMetadata(session: Session): void {
   }
 
   for (const sub of candidates) {
-    applyMetadata(sub, metadataById.get(sub.id));
+    applyMetadata(sub, metadataById.get(sub.launchId ?? sub.id));
   }
 }
 
@@ -55,6 +63,9 @@ function applyMetadata(sub: SubAgent, meta: SidecarMetadata | undefined): void {
   }
   if (meta.model && !sub.model) {
     sub.model = meta.model;
+  }
+  if (meta.agentId) {
+    sub.agentId = meta.agentId;
   }
 }
 
@@ -138,9 +149,21 @@ function readSidecarFile(filePath: string): SidecarMetadata | null {
       agentType: typeof fields.agentType === 'string' ? fields.agentType : undefined,
       model: typeof fields.model === 'string' ? fields.model : undefined,
       toolUseId: typeof fields.toolUseId === 'string' ? fields.toolUseId : undefined,
+      agentId: extractAgentIdFromFilename(path.basename(filePath)),
     };
   } catch (err) {
     logDebug(`subagentMetadata: failed to read sidecar ${filePath}: ${String(err)}`);
     return null;
   }
+}
+
+/**
+ * The sidecar filename is `agent-<id>.meta.json`; `<id>` is the raw agentId Claude Code assigns
+ * the subagent internally. Confirmed against real sidecars from one session: only 2 of 4 launches
+ * passed `name` in the Agent tool's input — the other 2 are only addressable by this id, which is
+ * exactly the form SendMessage's `to` carries for them (see subagentDetector.ts's
+ * findSubagentEntryByTarget).
+ */
+function extractAgentIdFromFilename(fileName: string): string | undefined {
+  return fileName.match(/^agent-(.+)\.meta\.json$/)?.[1];
 }

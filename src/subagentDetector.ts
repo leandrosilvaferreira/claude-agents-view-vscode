@@ -5,6 +5,7 @@ import { LogEntry } from './logParser';
 export function detectSubagents(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
   detectAntigravityCalls(json, currentSubagents);
   detectClaudeCalls(json, currentSubagents);
+  detectSendMessageResume(json, currentSubagents);
   detectClaudeStandaloneCalls(json, currentSubagents);
   detectCompletions(json, currentSubagents);
 }
@@ -77,6 +78,99 @@ function getClaudeModel(block: { input?: { model?: string } }): string | undefin
   return block.input?.model;
 }
 
+/**
+ * `SendMessage({to, message})` can resume a subagent that already reported completion — Claude
+ * Code re-invokes it from its saved transcript in the background instead of erroring. Real
+ * transcript evidence (a northwind-app session log): an agent finished at 20:51:44Z; 13m15s later a
+ * SendMessage addressed to its name silently restarted it, and the subagent stayed 'stopped' in
+ * the map that whole time because nothing recognized the resume — sessionActivity's
+ * hasRunningAgents saw no working subagent and the whole session read as idle.
+ *
+ * `to` can be the subagent's NAME (`to: "regression-logic"`) or, when the launch never set a
+ * `name`, its raw agentId (`to: "ad2d7960e4bd708a3a"`, format `a<hex>`) — confirmed against real
+ * sidecars from the same session: only 2 of 4 launches passed `name`, so the other 2 are only
+ * addressable by agentId. findSubagentEntryByTarget matches either, since neither is the id this
+ * map is keyed under.
+ *
+ * Once matched, the map entry is RE-KEYED to the SendMessage tool_use's own id — Claude Code's
+ * eventual <task-notification> for this resume carries THAT id, not the original launch's, so
+ * markStopped() needs no change to find it later (see detectTaskNotificationCompletion). The
+ * ORIGINAL launch id is stashed in `sub.launchId` before the rekey (set once — a later resume
+ * never overwrites it), because the sidecar `enrichSubagentMetadata` reads is written at launch
+ * time and keeps THAT id as its `toolUseId` forever; without `launchId`, re-keying `sub.id` would
+ * silently break that join and the resumed subagent would never get its real name/model (see
+ * subagentMetadata.ts).
+ *
+ * An unmatched `to` (name or agentId form) is a silent no-op: never fabricate a subagent from a
+ * SendMessage alone.
+ *
+ * Antigravity has no SendMessage equivalent, so nothing is done for it here — its own
+ * re-invocation of an existing tool call already flips the matching id back to 'working' via
+ * detectAntigravityCalls's unconditional `set()`.
+ */
+function detectSendMessageResume(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+  if (json.message && Array.isArray(json.message.content)) {
+    for (const block of json.message.content) {
+      if (!isSendMessageCall(block) || !block.id) {
+        continue;
+      }
+      const to = getSendMessageTarget(block);
+      if (!to) {
+        continue;
+      }
+      const entry = findSubagentEntryByTarget(currentSubagents, to);
+      if (!entry) {
+        continue;
+      }
+      reactivateSubagent(currentSubagents, entry, block.id);
+    }
+  }
+}
+
+/** Re-keys the map entry to the SendMessage's own tool_use id and flips it back to 'working'.
+ * `launchId` is set once — on the FIRST resume only, when it's still unset — so a later resume
+ * never overwrites the original launch id it needs to keep pointing at (see
+ * detectSendMessageResume's doc comment on why that id must survive the rekey). */
+function reactivateSubagent(currentSubagents: Map<string, SubAgent>, entry: [string, SubAgent], newId: string): void {
+  const [oldId, sub] = entry;
+  currentSubagents.delete(oldId);
+  if (sub.launchId === undefined) {
+    sub.launchId = oldId;
+  }
+  sub.status = 'working';
+  sub.id = newId;
+  currentSubagents.set(newId, sub);
+}
+
+function isSendMessageCall(block: { type: string; name?: string }): boolean {
+  return block.type === 'tool_use' && block.name === 'SendMessage';
+}
+
+function getSendMessageTarget(block: { input?: unknown }): string | undefined {
+  // `to` isn't part of LogEntry's typed `input` shape — this fix stays scoped to
+  // subagentDetector.ts, so `input` is read as unknown and narrowed locally here instead of
+  // widening the shared parser type (mirrors subagentMetadata.ts's sidecar field reads).
+  const input = block.input as Record<string, unknown> | undefined;
+  return typeof input?.to === 'string' ? input.to : undefined;
+}
+
+/** Last (most recently launched) match wins on a reused name/agentId — Map iteration is insertion
+ * order, and a relaunch always gets a fresh key, so "last" means "newest". Matches by name (the
+ * common case, when the launch passed one) or by the sidecar-derived agentId (subagentMetadata.ts)
+ * for a launch that didn't — SendMessage's `to` can address either form. */
+function findSubagentEntryByTarget(
+  currentSubagents: Map<string, SubAgent>,
+  target: string,
+): [string, SubAgent] | undefined {
+  let found: [string, SubAgent] | undefined;
+  for (const entry of currentSubagents) {
+    if (entry[1].name === target || entry[1].agentId === target) {
+      found = entry;
+    }
+  }
+  return found;
+}
+
 function detectClaudeStandaloneCalls(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
   if (isClaudeStandaloneCall(json)) {
     const id = json.id || Math.random().toString();
@@ -100,7 +194,14 @@ function detectCompletions(json: LogEntry, currentSubagents: Map<string, SubAgen
   // finished (observed: an agent ACKed at 17:58:09 only really finished at 18:07:06). Counting it
   // as a completion marked every async subagent "stopped" on the spot, so long-running agents
   // never appeared under "Working Agents". Their real completion is the <task-notification> below.
-  if (isAsyncLaunchAck(json)) {
+  // A SendMessage that resumes an already-completed subagent (detectSendMessageResume) gets its
+  // own ACK ~200ms later, carrying the SAME tool_use_id the subagent was just re-keyed under.
+  // Unlike the Agent tool's tool_result, this ACK has no `status` field at all — its real shape
+  // (confirmed against the same transcript evidence cited on detectSendMessageResume) is
+  // {success, message, resumedAgentId, pin}. Counting either ACK as a completion would flip the
+  // subagent back to 'stopped' immediately, undoing the launch/resume it just ACKed. Both real
+  // completions arrive later as the <task-notification> below, carrying the same id either way.
+  if (isLaunchOrResumeAck(json)) {
     return;
   }
 
@@ -126,9 +227,25 @@ function detectCompletions(json: LogEntry, currentSubagents: Map<string, SubAgen
   detectTaskNotificationCompletion(json, currentSubagents);
 }
 
+function isLaunchOrResumeAck(json: LogEntry): boolean {
+  return isAsyncLaunchAck(json) || isSendMessageResumeAck(json);
+}
+
 function isAsyncLaunchAck(json: LogEntry): boolean {
   // Match the launch status exactly: a finished async agent may still carry isAsync on its entry.
   return json.toolUseResult?.status === 'async_launched';
+}
+
+function isSendMessageResumeAck(json: LogEntry): boolean {
+  // `resumedAgentId` isn't part of LogEntry's typed `toolUseResult` shape — this fix stays scoped
+  // to subagentDetector.ts, so the value is widened to unknown and narrowed locally here instead
+  // of touching the shared parser type (mirrors subagentMetadata.ts's sidecar field reads).
+  const result: unknown = json.toolUseResult;
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    typeof (result as Record<string, unknown>).resumedAgentId === 'string'
+  );
 }
 
 /** A backgrounded agent reports completion as a <task-notification> turn in the PARENT transcript,

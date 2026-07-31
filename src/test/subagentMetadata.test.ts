@@ -146,4 +146,38 @@ describe('enrichSubagentMetadata', () => {
     expect(sub.model).toBe(firstModel);
     expect(sub.name).toBe('from-worktree');
   });
+
+  it('finds the sidecar by launchId after a SendMessage resume re-keys id away from the original launch (regression)', () => {
+    // Real incident sidecar (ae9f0a218b203f23b): toolUseId is fixed at launch time forever, even
+    // though detectSendMessageResume (subagentDetector.ts) re-keys the live SubAgent.id to a
+    // SendMessage's own tool_use id on resume. Without falling back to launchId here, this join
+    // silently stops matching and the resumed subagent never gets its real name/model.
+    writeSidecar(baseDirName, 'ae9f0a218b203f23b', {
+      agentType: 'debugger',
+      toolUseId: 'toolu_01F4PiHD54diBzmpQMR5mx1u',
+      model: 'sonnet',
+    });
+    const sub = makeSubagent({ id: 'toolu_01NGEeLuP4PNUqypNCbzSJr3', launchId: 'toolu_01F4PiHD54diBzmpQMR5mx1u' });
+    const session = makeSession({ subagents: [sub] });
+
+    enrichSubagentMetadata(session);
+
+    expect(sub.name).toBe('debugger');
+    expect(sub.model).toBe('sonnet');
+  });
+
+  it('reads agentId from the sidecar filename regardless of name/model enrichment', () => {
+    // Real sidecar from the same incident session: agent-ad2d7960e4bd708a3a.meta.json.
+    writeSidecar(baseDirName, 'ad2d7960e4bd708a3a', {
+      agentType: 'implementation-reviewer',
+      toolUseId: 'toolu_01XqXMspGQaPzA2Be92JahcY',
+      model: 'sonnet',
+    });
+    const sub = makeSubagent({ id: 'toolu_01XqXMspGQaPzA2Be92JahcY' });
+    const session = makeSession({ subagents: [sub] });
+
+    enrichSubagentMetadata(session);
+
+    expect(sub.agentId).toBe('ad2d7960e4bd708a3a');
+  });
 });
