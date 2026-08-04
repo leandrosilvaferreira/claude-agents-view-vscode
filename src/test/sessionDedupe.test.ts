@@ -7,6 +7,7 @@ import {
   findParentSession,
   sessionAsSubagent,
   applyNestedAgentLiveness,
+  upsertIfMoreRelevant,
 } from '../sessionDedupe';
 import { Session } from '../types';
 
@@ -121,6 +122,128 @@ describe('isMoreRelevant', () => {
     const b = makeSession({ id: 'b' });
     expect(isMoreRelevant(b, a)).toBe(true);
     expect(isMoreRelevant(a, b)).toBe(false);
+  });
+});
+
+describe('upsertIfMoreRelevant', () => {
+  // Regression: Claude Code's native worktree-entry (`type: 'relocated'` / `type:
+  // 'worktree-state'` — observed live in a real northwind-app transcript during the
+  // investigation session that found this bug, not preserved as a repo fixture, so they
+  // won't turn up in a grep here) can leave a near-empty stub transcript (one
+  // `custom-title` line, no `message`) under the BASE project dir sharing the exact same
+  // session-id filename as the real, actively-growing transcript that continues under the
+  // WORKTREE's own project dir (confirmed against a real capture: a 138-byte stub vs. a
+  // 4.25 MB live session, same id, genuinely different logFilePath). sessionTreeDataProvider's
+  // session Map is keyed by that bare id, and scanning both files with a blind
+  // `map.set(id, session)` let whichever file the scanner reached LAST win — an order that
+  // depends on fs.readdirSync, not relevance. At the moment this collision happens
+  // (mid-scan, before computeSessionStatus runs) both sessions are still 'stopped' and
+  // neither has working subagents yet, so lastInteractionTime is what must decide it —
+  // exactly the tie-break isMoreRelevant already has.
+  it('keeps the real session over a same-id stub regardless of scan order', () => {
+    const stub = makeSession({
+      id: 'dup',
+      status: 'stopped',
+      subagents: [],
+      lastInteractionTime: 1000,
+      logFilePath: '/base/dup.jsonl',
+    });
+    const real = makeSession({
+      id: 'dup',
+      status: 'stopped',
+      subagents: [],
+      lastInteractionTime: 9000,
+      logFilePath: '/base/.claude/worktrees/x/dup.jsonl',
+    });
+
+    const stubScannedFirst = new Map<string, Session>();
+    upsertIfMoreRelevant(stubScannedFirst, stub.id, stub);
+    upsertIfMoreRelevant(stubScannedFirst, real.id, real);
+    expect(stubScannedFirst.get('dup')).toBe(real);
+
+    const realScannedFirst = new Map<string, Session>();
+    upsertIfMoreRelevant(realScannedFirst, real.id, real);
+    upsertIfMoreRelevant(realScannedFirst, stub.id, stub);
+    expect(realScannedFirst.get('dup')).toBe(real);
+  });
+
+  it('inserts into an empty slot unconditionally', () => {
+    const map = new Map<string, Session>();
+    const session = makeSession({ id: 'fresh' });
+    upsertIfMoreRelevant(map, session.id, session);
+    expect(map.get('fresh')).toBe(session);
+  });
+
+  // HIGH (code-reviewer): isMoreRelevant's final `a.id > b.id` tiebreak is a no-op inside
+  // upsertIfMoreRelevant specifically, because every entry in this map is stored under its
+  // own id — so existing.id === key === candidate.id on every real call, and `x > x` is
+  // always false. When the first three criteria (status, working-subagent count,
+  // lastInteractionTime) also tie — plausible when a worktree stub and its real transcript
+  // are written within the same mtime tick, especially on filesystems with coarse mtime
+  // granularity — isMoreRelevant returns false in BOTH directions, and without a further
+  // tiebreak whichever was scanned first silently wins again: the exact bug this function
+  // exists to eliminate. logFilePath always differs between the two files in the real
+  // collision (confirmed: stub vs. worktree transcript are never the same file), so it's a
+  // safe deterministic tiebreak that doesn't depend on scan order.
+  it('breaks a genuine tie (same status, working-count, lastInteractionTime) by logFilePath, not scan order', () => {
+    const stub = makeSession({
+      id: 'dup',
+      status: 'stopped',
+      subagents: [],
+      lastInteractionTime: 5000,
+      logFilePath: '/aaa/stub.jsonl',
+    });
+    const real = makeSession({
+      id: 'dup',
+      status: 'stopped',
+      subagents: [],
+      lastInteractionTime: 5000,
+      logFilePath: '/zzz/real.jsonl',
+    });
+
+    const stubFirst = new Map<string, Session>();
+    upsertIfMoreRelevant(stubFirst, stub.id, stub);
+    upsertIfMoreRelevant(stubFirst, real.id, real);
+    expect(stubFirst.get('dup')).toBe(real);
+
+    const realFirst = new Map<string, Session>();
+    upsertIfMoreRelevant(realFirst, real.id, real);
+    upsertIfMoreRelevant(realFirst, stub.id, stub);
+    expect(realFirst.get('dup')).toBe(real);
+  });
+
+  // MEDIUM (typescript-reviewer): a freshly (re)parsed Session always starts 'stopped' with
+  // no subagents (logParser.ts's createEmptySession default) — computeSessionStatus only
+  // classifies it afterward. logParser.ts's shrink/rebuild path (file truncated then
+  // rewritten, e.g. after /clear or compaction) hands back a brand-new Session object for a
+  // file it just re-read from scratch. That candidate isn't a rival in a cross-file id
+  // collision — it's strictly newer data for the exact same session — but by
+  // isMoreRelevant's own criteria it can look "less relevant" than a stale cached object
+  // still 'working' from before the rebuild. Before this function existed, the unconditional
+  // `.set()` always let the latest parse of a file win; upsertIfMoreRelevant must preserve
+  // that for a same-file reparse (same logFilePath) and reserve its relevance comparison for
+  // genuinely different files.
+  it('replaces a stale cached entry unconditionally when the candidate is a fresh reparse of the same file', () => {
+    const sharedPath = '/proj/session.jsonl';
+    const stale = makeSession({
+      id: 'dup',
+      status: 'working',
+      logFilePath: sharedPath,
+      lastInteractionTime: 9000,
+      subagents: [{ id: 'a', name: 'x', task: 't', status: 'working' }],
+    });
+    const freshReparse = makeSession({
+      id: 'dup',
+      status: 'stopped',
+      logFilePath: sharedPath,
+      lastInteractionTime: 1000,
+      subagents: [],
+    });
+
+    const map = new Map<string, Session>([['dup', stale]]);
+    upsertIfMoreRelevant(map, freshReparse.id, freshReparse);
+
+    expect(map.get('dup')).toBe(freshReparse);
   });
 });
 

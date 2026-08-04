@@ -1,6 +1,12 @@
 import * as path from 'path';
 import { Session, SubAgent } from './types';
-import { findParentSession, getDedupeKey, isAgentSession, isMoreRelevant, sessionAsSubagent } from './sessionDedupe';
+import {
+  findParentSession,
+  getDedupeKey,
+  isAgentSession,
+  sessionAsSubagent,
+  upsertIfMoreRelevant,
+} from './sessionDedupe';
 
 export interface AssembledSessions {
   /** Sessions to render at the top level (all humans + orphan background agents). */
@@ -48,11 +54,7 @@ export function assembleVisibleSessions(all: Session[], activePaths: string[], n
 
   const dedupeMap = new Map<string, Session>();
   for (const session of topLevelSessions) {
-    const key = getDedupeKey(session);
-    const cur = dedupeMap.get(key);
-    if (!cur || isMoreRelevant(session, cur)) {
-      dedupeMap.set(key, session);
-    }
+    upsertIfMoreRelevant(dedupeMap, getDedupeKey(session), session);
   }
 
   // Working sessions render before inactive ones — a live subagent can outlast its parent's

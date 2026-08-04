@@ -7,7 +7,7 @@ import { LogParser } from './logParser';
 import { scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
 import { assembleVisibleSessions } from './sessionAssembly';
-import { applyNestedAgentLiveness } from './sessionDedupe';
+import { applyNestedAgentLiveness, upsertIfMoreRelevant } from './sessionDedupe';
 import { computeSessionStatus, getOpenLogFiles } from './sessionActivity';
 import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
 import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible } from './claudeCompat';
@@ -268,7 +268,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     logDebug(`SessionTreeDataProvider: handleFileChange() for ${filePath} (${type})`);
     try {
       const session = this.logParser.parse(filePath, type);
-      this.sessions.set(session.id, session);
+      upsertIfMoreRelevant(this.sessions, session.id, session);
 
       // Check active status after change
       void this.updateActiveStatuses().then(() => {
@@ -289,7 +289,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     for (const file of files) {
       try {
         const session = this.logParser.parse(file.path, file.type);
-        this.sessions.set(session.id, session);
+        upsertIfMoreRelevant(this.sessions, session.id, session);
       } catch (err) {
         logDebug(`SessionTreeDataProvider: Failed to parse file ${file.path}: ${String(err)}`);
       }

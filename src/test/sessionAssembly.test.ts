@@ -30,12 +30,16 @@ describe('assembleVisibleSessions', () => {
   });
 
   it('collapses two same-branch sessions that share a title into one slot', () => {
+    // Two distinct logFilePaths: this models two genuinely different session files (e.g. two
+    // Claude Code windows on the same repo) colliding on dedupe key, not a same-file reparse —
+    // upsertIfMoreRelevant only skips the relevance check when logFilePath actually matches.
     const a = makeSession({
       id: 'a',
       gitBranch: 'feat/x',
       projectPath: '/repo/wt/x',
       sessionTitle: 'same title',
       subagents: [],
+      logFilePath: '/tmp/a.jsonl',
     });
     const b = makeSession({
       id: 'b',
@@ -43,6 +47,7 @@ describe('assembleVisibleSessions', () => {
       projectPath: '/repo/wt/x',
       sessionTitle: 'same title',
       status: 'stopped',
+      logFilePath: '/tmp/b.jsonl',
     });
     const { topLevel } = assembleVisibleSessions([a, b], [], NOW);
     expect(topLevel).toHaveLength(1);

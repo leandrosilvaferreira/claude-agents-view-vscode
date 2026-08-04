@@ -109,3 +109,40 @@ export function isMoreRelevant(a: Session, b: Session): boolean {
   if (a.lastInteractionTime !== b.lastInteractionTime) return a.lastInteractionTime > b.lastInteractionTime;
   return a.id > b.id; // final stable tiebreak
 }
+
+/** Set `candidate` at `key`, but never let a less relevant session overwrite one already
+ * there. A session id can collide across two files — Claude Code's native worktree-entry
+ * can leave a same-id stub transcript in the base project dir while the real transcript
+ * continues under the worktree's own dir — so the caller's scan order must not decide the
+ * winner the way a plain `map.set(key, candidate)` would.
+ *
+ * Two cases isMoreRelevant alone can't resolve, because this map is always keyed by session
+ * id and every entry was inserted under its own id — so existing.id === key === candidate.id
+ * on every call, which makes isMoreRelevant's final `a.id > b.id` tiebreak a no-op (`x > x`
+ * is always false):
+ *
+ * 1. Same file, fresher parse. logParser.ts's shrink/rebuild path (file truncated then
+ *    rewritten, e.g. after /clear or compaction) hands back a brand-new Session object for a
+ *    file it just re-read from scratch — freshly parsed, so still 'stopped' with no
+ *    subagents until computeSessionStatus classifies it. That candidate isn't a rival for the
+ *    slot, it's newer data for the exact same session, so a same logFilePath always wins
+ *    unconditionally, skipping the relevance comparison entirely.
+ * 2. A genuine cross-file collision where isMoreRelevant ties in both directions (status,
+ *    working-subagent count and lastInteractionTime all equal — plausible when a worktree
+ *    stub and its real transcript are written within the same mtime tick). Broken by the one
+ *    thing that still differs and is independent of scan order: the files' own paths.
+ */
+export function upsertIfMoreRelevant(map: Map<string, Session>, key: string, candidate: Session): void {
+  const existing = map.get(key);
+  if (!existing || existing.logFilePath === candidate.logFilePath) {
+    map.set(key, candidate);
+    return;
+  }
+  if (isMoreRelevant(candidate, existing)) {
+    map.set(key, candidate);
+    return;
+  }
+  if (!isMoreRelevant(existing, candidate) && candidate.logFilePath > existing.logFilePath) {
+    map.set(key, candidate);
+  }
+}
