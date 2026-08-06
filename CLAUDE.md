@@ -132,6 +132,10 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   or live subagents).
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
+  Three Claude launch shapes, only one of which is a `tool_use`: classic `Agent` tool,
+  `<forked-skill-launch>` on a `type:"system"` entry (`context: fork` skills like
+  `/code-review`), and in-process teammates (grandchildren — deliberately not detected).
+  See `.claude/memory/architecture-subagent-dispatch-mechanisms.md`.
 - **subagentMetadata.ts** — fills a detected subagent's real name/model from the
   `agent-<id>.meta.json` sidecar, joined on `toolUseId`; looks in both the transcript's
   own directory and the one `projectPath` encodes to (they differ inside a worktree).

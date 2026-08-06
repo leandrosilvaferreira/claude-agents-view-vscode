@@ -1,5 +1,6 @@
 import { SubAgent } from './types';
 import { LogEntry } from './logParser';
+import { detectForkedSkillLaunch } from './forkedSkillDetector';
 
 /** Detect subagent starts/completions from one log entry and mutate the running map. */
 export function detectSubagents(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
@@ -7,6 +8,7 @@ export function detectSubagents(json: LogEntry, currentSubagents: Map<string, Su
   detectClaudeCalls(json, currentSubagents);
   detectSendMessageResume(json, currentSubagents);
   detectClaudeStandaloneCalls(json, currentSubagents);
+  detectForkedSkillLaunch(json, currentSubagents);
   detectCompletions(json, currentSubagents);
 }
 
@@ -248,16 +250,28 @@ function isSendMessageResumeAck(json: LogEntry): boolean {
   );
 }
 
-/** A backgrounded agent reports completion as a <task-notification> turn in the PARENT transcript,
- * carrying the <tool-use-id> of the Agent call that spawned it — the key subagents are stored under. */
+/** A backgrounded agent reports completion as a <task-notification> turn in the PARENT transcript.
+ * A classic Agent-tool dispatch carries the <tool-use-id> of the tool_use that spawned it — the
+ * key subagents are stored under. A forked-skill launch (forkedSkillDetector.ts) never had a
+ * tool_use, so its notification carries only <task-id>, which IS the agentId it was keyed under.
+ * Both are tried independently. The <tool-use-id> path is a plain map-key lookup that no-ops on a
+ * miss. The <task-id> path goes through markStoppedByTaskId, which ALSO matches on `.agentId` —
+ * so a classic subagent's own <task-id> can resolve too, since subagentMetadata fills `.agentId`
+ * from the sidecar filename. That is correct, not a collision: it's the same agent addressed by
+ * its other id. Verified against real corpus (~3GB, 317 projects): 248 files carry <task-id>, 262
+ * carry <tool-use-id>, 247 carry both — <task-id> alone is exactly the forked-skill case. */
 function detectTaskNotificationCompletion(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
   const text = getEntryText(json);
   if (!text.includes('<task-notification>')) {
     return;
   }
-  const match = text.match(/<tool-use-id>([^<]+)<\/tool-use-id>/);
-  if (match) {
-    markStopped(currentSubagents, match[1].trim());
+  const toolUseIdMatch = text.match(/<tool-use-id>([^<]+)<\/tool-use-id>/);
+  if (toolUseIdMatch) {
+    markStopped(currentSubagents, toolUseIdMatch[1].trim());
+  }
+  const taskIdMatch = text.match(/<task-id>([^<]+)<\/task-id>/);
+  if (taskIdMatch) {
+    markStoppedByTaskId(currentSubagents, taskIdMatch[1].trim());
   }
 }
 
@@ -290,4 +304,38 @@ function markStopped(currentSubagents: Map<string, SubAgent>, id: string): void 
   if (sub) {
     sub.status = 'stopped';
   }
+}
+
+/**
+ * <task-id> is the agentId. For a subagent whose map key still equals its agentId, this is
+ * exactly markStopped(). It only diverges after a SendMessage resume (reactivateSubagent)
+ * re-keys the entry to the resume's own tool_use id while leaving `.agentId` untouched — a
+ * plain map.get(id) would then miss, leaving the subagent stuck 'working' forever, which (via
+ * sessionDedupe.applyNestedAgentLiveness) pins the whole parent session 'working' too.
+ *
+ * DEFENSIVE, not a fix for a reproduced failure: no transcript observed so far has actually hit
+ * this path — the one real post-resume notification seen carried BOTH tags, and <tool-use-id>
+ * alone already resolved it. This guards a plausible shape that just hasn't shown up yet.
+ */
+function markStoppedByTaskId(currentSubagents: Map<string, SubAgent>, taskId: string): void {
+  if (currentSubagents.has(taskId)) {
+    markStopped(currentSubagents, taskId);
+    return;
+  }
+  const fallback = findSubagentByAgentId(currentSubagents, taskId);
+  if (fallback) {
+    fallback.status = 'stopped';
+  }
+}
+
+/** Last (most recently launched) match wins on a reused agentId, mirroring
+ * findSubagentEntryByTarget's iteration-order tie-break. */
+function findSubagentByAgentId(currentSubagents: Map<string, SubAgent>, agentId: string): SubAgent | undefined {
+  let found: SubAgent | undefined;
+  for (const sub of currentSubagents.values()) {
+    if (sub.agentId === agentId) {
+      found = sub;
+    }
+  }
+  return found;
 }
