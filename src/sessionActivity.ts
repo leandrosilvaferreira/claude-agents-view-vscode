@@ -18,21 +18,37 @@ import { logDebug } from './logger';
  * OR it still has subagents that never reported completion. Those three are capped by
  * IDLE_CEILING so a session abandoned mid-turn, or one whose agent completion notification we
  * missed, eventually goes quiet instead of spinning forever.
+ *
+ * The "last entry is a user turn" reading has one carve-out: Claude Code writes the user's own
+ * Esc-interruption as a `type: 'user'` turn too (see logParser.ts's INTERRUPTION_TEXTS), and
+ * Claude owes that turn nothing — the user killed it, not Claude. Without the carve-out, an
+ * interrupted session read as 'working' for up to IDLE_CEILING after the user backed out of it.
+ * The other two conditions are untouched: a still-thinking or still-running-subagent session
+ * stays 'working' regardless of the interruption.
  */
+// Shared with subagentMetadata.ts's best-effort grandchild status (mtime of a child's
+// sidecar-sibling .jsonl) — one definition of "recent" for the whole codebase, exported so it
+// isn't duplicated as a second magic-number literal there.
+export const RECENT_WRITE = 60 * 1000;
+// Also shared with subagentMetadata.ts: a grandchild's status has NO signal besides mtime (no
+// awaitingReply/isThinking/hasRunningAgents to fall back on the way computeSessionStatus below
+// does), so it needs the same generous ceiling this function uses for a session that's gone
+// quiet mid-turn — not the much tighter RECENT_WRITE, which is a "just wrote a moment ago"
+// signal for a DIFFERENT purpose. See subagentMetadata.ts's computeChildStatus.
+export const IDLE_CEILING = 30 * 60 * 1000;
+
 export function computeSessionStatus(session: Session, openFiles: Set<string>): 'working' | 'stopped' {
   if (openFiles.has(path.normalize(session.logFilePath))) {
     return 'working';
   }
   const idle = Date.now() - session.lastInteractionTime;
-  const RECENT_WRITE = 60 * 1000;
-  const IDLE_CEILING = 30 * 60 * 1000;
   if (idle < RECENT_WRITE) {
     return 'working';
   }
   if (idle >= IDLE_CEILING) {
     return 'stopped';
   }
-  const awaitingReply = session.lastEntryType === 'user';
+  const awaitingReply = session.lastEntryType === 'user' && !session.lastEntryIsInterruption;
   const isThinking = session.lastEntryIsThinking === true;
   const hasRunningAgents = session.subagents.some((sub) => sub.status === 'working');
   return awaitingReply || isThinking || hasRunningAgents ? 'working' : 'stopped';

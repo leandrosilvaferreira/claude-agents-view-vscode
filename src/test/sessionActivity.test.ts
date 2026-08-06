@@ -76,6 +76,42 @@ describe('computeSessionStatus', () => {
     expect(status).toBe('working');
   });
 
+  it('stops a session whose last turn was the user interrupting Claude', () => {
+    // Claude Code writes an Esc-interruption as a `type: 'user'` turn, so lastEntryType alone
+    // can't tell it apart from a real prompt still awaiting a reply — that's what
+    // lastEntryIsInterruption is for. Without it, an interrupted session read as 'working' for
+    // up to IDLE_CEILING (30 min) after the user killed it.
+    const status = computeSessionStatus(session({ lastEntryType: 'user', lastEntryIsInterruption: true }), noOpenFiles);
+
+    expect(status).toBe('stopped');
+  });
+
+  it('reports working for an interrupted session that still has a subagent running', () => {
+    // hasRunningAgents sits in the same OR as awaitingReply, independent of it — a background
+    // agent survives the Esc that killed the main turn and must keep the session visible.
+    const status = computeSessionStatus(
+      session({
+        lastEntryType: 'user',
+        lastEntryIsInterruption: true,
+        subagents: [{ id: 'toolu_1', name: 'explorer', task: 'map the codebase', status: 'working' }],
+      }),
+      noOpenFiles,
+    );
+
+    expect(status).toBe('working');
+  });
+
+  it('stops a session left awaiting a reply past the idle ceiling', () => {
+    // Mirrors 'stops a session left thinking past the idle ceiling' above: a genuine unanswered
+    // user turn must not spin forever either.
+    const stale = session({
+      lastEntryType: 'user',
+      lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES,
+    });
+
+    expect(computeSessionStatus(stale, noOpenFiles)).toBe('stopped');
+  });
+
   it('reports working when the log file is held open, whatever the heuristics say', () => {
     const stale = session({ lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES });
     const open = new Set([stale.logFilePath]);

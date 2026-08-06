@@ -105,6 +105,139 @@ describe('LogParser session signals', () => {
     expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsThinking).toBe(true);
   });
 
+  it('flags a transcript whose last turn is the user-interruption sentinel', () => {
+    // Claude Code marks an Esc-interruption with no structural field at all (no stop_reason, no
+    // isMeta, no origin) — the only signal is this literal text, standing alone as the whole user
+    // turn. Real sample (~/.claude/projects/.../6374bbc7-....jsonl): content arrives as a single
+    // text block in an array, which is what this test mirrors.
+    const parser = new LogParser();
+
+    const interrupted = {
+      timestamp: '2026-08-05T22:21:54.460Z',
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user]' }] },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(interrupted) + '\n');
+
+    const session = parser.parse(tempFilePath, 'claude-code');
+    expect(session.lastEntryType).toBe('user');
+    expect(session.lastEntryIsInterruption).toBe(true);
+  });
+
+  it('also matches the interruption sentinel when message.content is a plain string', () => {
+    // The other content shape real transcripts use — must be recognized too, not just the
+    // array-of-blocks form above.
+    const parser = new LogParser();
+
+    const interrupted = {
+      timestamp: '2026-08-05T22:21:54.460Z',
+      type: 'user',
+      message: { role: 'user', content: '[Request interrupted by user]' },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(interrupted) + '\n');
+
+    expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsInterruption).toBe(true);
+  });
+
+  it('also matches the "for tool use" interruption variant', () => {
+    // Second real variant confirmed on the local transcript corpus (Claude Code cancelling a
+    // pending tool call specifically), at meaningful volume alongside the plain form.
+    const parser = new LogParser();
+
+    const interrupted = {
+      timestamp: '2026-08-05T22:21:54.460Z',
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user for tool use]' }] },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(interrupted) + '\n');
+
+    expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsInterruption).toBe(true);
+  });
+
+  it('clears the interruption flag once a real user turn follows it', () => {
+    // The trap: a flag that only ever turns on is worse than no flag at all. If the user
+    // interrupts and then types a new prompt, the session must count as awaiting a reply again.
+    const parser = new LogParser();
+
+    const interrupted = {
+      timestamp: '2026-08-05T22:21:54.460Z',
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user]' }] },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(interrupted) + '\n');
+    expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsInterruption).toBe(true);
+
+    const realPrompt = {
+      timestamp: '2026-08-05T22:22:10.000Z',
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: 'Try again, but simpler' }] },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(realPrompt) + '\n');
+
+    expect(new LogParser().parse(tempFilePath, 'claude-code').lastEntryIsInterruption).toBe(false);
+  });
+
+  it('does not flag a real user turn that merely quotes the interruption phrase', () => {
+    // Exact match only, never includes() — a user can legitimately discuss this exact sentinel in
+    // a real prompt, and that session genuinely is awaiting a reply.
+    const parser = new LogParser();
+
+    const line = {
+      timestamp: '2026-08-05T22:21:54.460Z',
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'text', text: 'Why does it say [Request interrupted by user] here?' }],
+      },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(line) + '\n');
+
+    expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsInterruption).toBe(false);
+  });
+
+  it('does not flag a multi-block turn even when one block exactly matches the sentinel', () => {
+    // A genuine interruption entry is always a single lone text block. Extra blocks mean this is
+    // a real, richer turn that merely happens to contain the phrase among other content.
+    const parser = new LogParser();
+
+    const line = {
+      timestamp: '2026-08-05T22:21:54.460Z',
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'text', text: '[Request interrupted by user]' },
+          { type: 'text', text: 'actually, continue' },
+        ],
+      },
+    };
+    fs.appendFileSync(tempFilePath, JSON.stringify(line) + '\n');
+
+    expect(parser.parse(tempFilePath, 'claude-code').lastEntryIsInterruption).toBe(false);
+  });
+
+  it('does not let trailing bookkeeping entries erase an interruption signal', () => {
+    // Mirrors the awaited-reply test below: attachment/last-prompt/ai-title carry no `message`,
+    // so none of them may resurrect or erase lastEntryIsInterruption either.
+    const parser = new LogParser();
+
+    const lines = [
+      {
+        timestamp: '2026-08-05T22:21:54.460Z',
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user]' }] },
+      },
+      { type: 'attachment' },
+      { type: 'last-prompt' },
+      { type: 'ai-title', aiTitle: 'Some title' },
+    ];
+    fs.appendFileSync(tempFilePath, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+
+    const session = parser.parse(tempFilePath, 'claude-code');
+    expect(session.lastEntryType).toBe('user');
+    expect(session.lastEntryIsInterruption).toBe(true);
+  });
+
   it('does not let trailing bookkeeping entries (attachment, last-prompt, ai-title) erase an awaited-reply signal', () => {
     // Real transcripts write `attachment`/`last-prompt`/`ai-title` entries right after every turn,
     // before the next assistant turn begins — `attachment` is by far the most frequent of the
