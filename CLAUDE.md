@@ -136,9 +136,16 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `<forked-skill-launch>` on a `type:"system"` entry (`context: fork` skills like
   `/code-review`), and in-process teammates (grandchildren — deliberately not detected).
   See `.claude/memory/architecture-subagent-dispatch-mechanisms.md`.
-- **subagentMetadata.ts** — fills a detected subagent's real name/model from the
-  `agent-<id>.meta.json` sidecar, joined on `toolUseId`; looks in both the transcript's
-  own directory and the one `projectPath` encodes to (they differ inside a worktree).
+- **sidecarReader.ts** — reads the `agent-<id>.meta.json` sidecars from both candidate
+  directories (the transcript's own and the one `projectPath` encodes to — they differ
+  inside a worktree), dedupes across them, and caches by filename set so a refresh that
+  changed nothing re-parses nothing.
+- **subagentMetadata.ts** — fills a detected subagent's real name/model from the sidecar,
+  joined on `toolUseId`. Runs on parse (`logParser`).
+- **nestedSubagents.ts** — attaches grandchildren (subagents launched by a subagent) via
+  the sidecar's `parentAgentId`, one level deep, with a best-effort mtime status. Runs on
+  the refresh tick, NOT on parse: a background subagent writes only two lines to the
+  parent transcript, so parse-driven refresh would go stale exactly while it works.
 - **nameExtractor.ts** — derives the session title from the first real user prompt,
   skipping slash-command scaffolding and `isMeta` turns.
 - **sessionDedupe.ts** — pure dedupe key, stable relevance ranking,
@@ -149,6 +156,8 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   Claude Code's native worktree-entry can never overwrite the real session).
 - **treeItems.ts** — the `vscode.TreeItem` subclasses (Brand/Session/SubAgentGroup/
   SubAgent/Message) + model-badge and relative-time formatting.
+- **subagentTreeChildren.ts** — pure builders for the subagent and nested-subagent
+  (grandchild) tree levels, extracted from `sessionTreeDataProvider`.
 - **types.ts** — the `Session` and `SubAgent` domain shapes.
 - **logger.ts** — best-effort debug append to a local file; never throws.
 
@@ -161,7 +170,7 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`, `sessionActivity`
   import no `vscode` and are
   unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,
-  `treeItems.ts` touch the VS Code API.
+  `treeItems.ts`, `subagentTreeChildren.ts` touch the VS Code API.
 - **Parse incrementally** — `LogParser` caches a per-file byte offset and reads only
   appended bytes; never re-read a whole transcript on refresh.
 - **Dedupe/ranking stays deterministic and stable** (`isMoreRelevant`) so the tree

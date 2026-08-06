@@ -11,6 +11,8 @@ import { applyNestedAgentLiveness, upsertIfMoreRelevant } from './sessionDedupe'
 import { computeSessionStatus, getOpenLogFiles } from './sessionActivity';
 import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
 import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible } from './claudeCompat';
+import { getNestedSubAgentChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
+import { refreshNestedSubagents } from './nestedSubagents';
 
 type TreeItemType = BrandTreeItem | MessageTreeItem | SessionTreeItem | SubAgentGroupTreeItem | SubAgentTreeItem;
 
@@ -145,9 +147,9 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
       }
       return groups;
     } else if (element instanceof SubAgentGroupTreeItem) {
-      // Level 4: Actual subagent tree items
-      const items = element.subagents.map((sub) => new SubAgentTreeItem(sub, element.parentSession));
-      return items;
+      return getSubAgentGroupChildren(element); // Level 4 (subagentTreeChildren.ts)
+    } else if (element instanceof SubAgentTreeItem) {
+      return getNestedSubAgentChildren(element); // Level 5, nested "grandchildren" (subagentTreeChildren.ts)
     }
     return [];
   }
@@ -333,6 +335,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
 
       for (const session of sessions) {
         session.status = computeSessionStatus(session, openFiles);
+        refreshNestedSubagents(session);
       }
       // computeSessionStatus only sees same-file subagents; fold in cross-file nested agents
       // (background agents in their own transcript, matched by project+branch) so a launcher

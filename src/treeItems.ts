@@ -127,7 +127,14 @@ export class SubAgentTreeItem extends vscode.TreeItem {
     public readonly subagent: SubAgent,
     public readonly parentSession: Session,
   ) {
-    super(`🤖 ${subagent.name}`, vscode.TreeItemCollapsibleState.None);
+    // Collapsible only when this subagent has its own nested subagents ("grandchildren" —
+    // subagentMetadata.ts's attachNestedSubagents). A grandchild SubAgent never has `.children`
+    // itself (nesting is truncated to one level), so this naturally renders as a leaf again for it.
+    const hasChildren = (subagent.children?.length ?? 0) > 0;
+    super(
+      `🤖 ${subagent.name}`,
+      hasChildren ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+    );
 
     this.contextValue = 'subagent';
     // Subagent's own model, falling back to the session model when it inherits it.

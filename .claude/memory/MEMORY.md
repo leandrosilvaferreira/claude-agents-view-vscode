@@ -8,6 +8,8 @@
 
 - [Why tsconfig pins `types: ["node"]`](architecture-types-node-pin-under-nodenext.md) — an ESM-flagged transitive `@types/chai` kills global `@types` inclusion under NodeNext; looks like a broken `@types/node` but isn't.
 
+- [Green fixtures prove nothing here](architecture-fixtures-hide-real-log-shapes.md) — 153 tests + 2 reviews passed a parser bug that one run against real transcripts caught; validate against `~/.claude/projects/**`.
+
 - [Three subagent dispatch mechanisms](architecture-subagent-dispatch-mechanisms.md) — classic `Agent` tool_use vs `<forked-skill-launch>` (no tool_use, `<task-id>` completion) vs in-process teammates (invisible: grandchildren).
 
 - [Subagent transcript layout on disk](reference-transcript-subagent-layout.md) — subagents live in `<session-id>/subagents/agent-*.jsonl`; `scanClaudeSubSessions` looks in a `sessions/` dir that never exists; native worktree-entry leaves a same-id stub that can collide (fixed via `upsertIfMoreRelevant`).

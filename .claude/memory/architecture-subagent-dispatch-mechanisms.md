@@ -22,9 +22,11 @@ Sidecars for (2) and (3) have **no `toolUseId`**, so `subagentMetadata.readSidec
 (which indexes only by `toolUseId`) silently ignores them — name/model must come from the
 launch payload itself.
 
-**Still unhandled by design:** (3) is invisible in the tree — those teammates are
-grandchildren, launched inside the forked agent's transcript, which the parser never reads.
-Observed real case: 11 `angle-*` reviewers under one `/code-review`.
+**Grandchildren** (a subagent's own subagents, incl. (3)) are joined from the sidecar's
+`parentAgentId` — never from the launching transcript, which the parser does not read.
+`parentAgentId` always holds the raw agentId, never a `toolUseId`, so the parent's
+`sub.agentId` must be filled from its own sidecar or the join silently yields nothing.
+`spawnDepth` is NOT a reliable depth: it is `1` even for teammates that are grandchildren.
 
 **Why:** `<forked-skill-launch>` looks like plain bookkeeping text, so the launch reads as a
 no-op line; the whole session showed as `working` with zero subagents and nothing in the code

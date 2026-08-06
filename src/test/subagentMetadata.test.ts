@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { enrichSubagentMetadata } from '../subagentMetadata';
+import { refreshNestedSubagents } from '../nestedSubagents';
 import { Session, SubAgent } from '../types';
 
 // Mirrors the real on-disk layout: <claudeProjectsDir>/<encoded-project-dir>/<sessionId>/subagents/agent-<id>.meta.json.
@@ -179,5 +180,84 @@ describe('enrichSubagentMetadata', () => {
     enrichSubagentMetadata(session);
 
     expect(sub.agentId).toBe('ad2d7960e4bd708a3a');
+  });
+
+  // Real bug (northwind-app session cedc87e2): classic-dispatch launches almost always carry an
+  // explicit name+model already (measured 113/113 across 3 real sessions) — so the OLD
+  // needsEnrichment (name==='Agent' || !model) never even looked at the sidecar for them, and
+  // agentId — the identity nestedSubagents.ts's attachNestedSubagents joins grandchildren on —
+  // never got filled. Every fixture above defaults to name:'Agent', which is exactly why 153
+  // passing tests didn't catch this: none of them modeled a subagent already fully named at launch.
+  describe('agentId identity join (subagent already named+modeled at launch)', () => {
+    it('fills agentId from the sidecar even though name and model already came from the launch', () => {
+      // Real shape from the incident session: tool_use id, sidecar filename id, and the
+      // toolUseId inside the sidecar content are three different strings.
+      writeSidecar(baseDirName, 'a78c4c6e2dedda529', {
+        agentType: 'step21',
+        toolUseId: 'toolu_019pTr8gjEmq4iynxWiapJU2',
+        model: 'haiku',
+      });
+      const sub = makeSubagent({ id: 'toolu_019pTr8gjEmq4iynxWiapJU2', name: 'step21', model: 'haiku' });
+      const session = makeSession({ subagents: [sub] });
+
+      enrichSubagentMetadata(session);
+
+      expect(sub.agentId).toBe('a78c4c6e2dedda529');
+      expect(sub.name).toBe('step21'); // launch-provided name untouched, not overwritten
+      expect(sub.model).toBe('haiku'); // launch-provided model untouched
+    });
+
+    it('lets a grandchild attach to that same parent once its agentId is filled (reproduces the northwind-app case)', () => {
+      writeSidecar(baseDirName, 'a78c4c6e2dedda529', {
+        agentType: 'step21',
+        toolUseId: 'toolu_019pTr8gjEmq4iynxWiapJU2',
+        model: 'haiku',
+      });
+      writeSidecar(baseDirName, 'child-of-step21', {
+        agentType: 'general-purpose',
+        parentAgentId: 'a78c4c6e2dedda529',
+        toolUseId: 'toolu_child_of_step21',
+      });
+      const sub = makeSubagent({ id: 'toolu_019pTr8gjEmq4iynxWiapJU2', name: 'step21', model: 'haiku' });
+      const session = makeSession({ subagents: [sub] });
+
+      enrichSubagentMetadata(session);
+      refreshNestedSubagents(session);
+
+      expect(sub.agentId).toBe('a78c4c6e2dedda529');
+      expect(sub.children).toHaveLength(1);
+      expect(sub.children?.[0].name).toBe('general-purpose');
+    });
+
+    it('leaves a forked-skill-shaped subagent (id already === agentId, no toolUseId sidecar) unaffected — regression', () => {
+      // detectForkedSkillLaunch sets id === agentId directly at detection time, with no model —
+      // so it was ALREADY a candidate via the pre-existing `!sub.model` check; the new
+      // `!sub.agentId` criterion changes nothing for it, since agentId is already truthy.
+      const sub = makeSubagent({
+        id: 'a2e15c98935a695a32',
+        agentId: 'a2e15c98935a695a32',
+        name: 'code-review',
+        model: undefined,
+      });
+      const session = makeSession({ subagents: [sub] });
+
+      expect(() => enrichSubagentMetadata(session)).not.toThrow();
+      expect(sub.agentId).toBe('a2e15c98935a695a32');
+      expect(sub.name).toBe('code-review');
+    });
+
+    it('leaves agentId unset for an already-named subagent with no matching sidecar, without throwing, across repeated calls', () => {
+      const sub = makeSubagent({ id: 'toolu_no_sidecar', name: 'already-named', model: 'sonnet' });
+      const session = makeSession({ subagents: [sub] });
+
+      expect(() => {
+        enrichSubagentMetadata(session);
+        enrichSubagentMetadata(session);
+        enrichSubagentMetadata(session);
+      }).not.toThrow();
+      expect(sub.agentId).toBeUndefined();
+      expect(sub.name).toBe('already-named');
+      expect(sub.model).toBe('sonnet');
+    });
   });
 });
