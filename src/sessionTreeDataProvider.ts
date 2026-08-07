@@ -13,6 +13,7 @@ import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem,
 import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible } from './claudeCompat';
 import { getNestedSubAgentChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
 import { refreshNestedSubagents } from './nestedSubagents';
+import { splitSubagentsByStatus } from './subagentGrouping';
 
 type TreeItemType = BrandTreeItem | MessageTreeItem | SessionTreeItem | SubAgentGroupTreeItem | SubAgentTreeItem;
 
@@ -127,16 +128,11 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
       const items = element.sessions.map((session) => new SessionTreeItem(session));
       return items;
     } else if (element instanceof SessionTreeItem) {
-      // Level 3: Working Agents / Completed Agents folders
-      // A stopped session can't have running agents — derive that here instead of mutating
-      // sub.status (cached across refreshes, keeps the session alive). Nested background-agent
-      // sessions carry their OWN status, so they aren't gated by the parent's working state.
-      const sessionWorking = element.session.status === 'working';
+      // Level 3: Working Agents / Completed Agents folders. Each subagent (own or nested) is
+      // bucketed by its own tracked status — see subagentGrouping.ts's doc comment for why the
+      // parent session's overall status must never override that.
       const nested = this.nestedAgents.get(element.session.id) ?? [];
-      const ownWorking = sessionWorking ? element.session.subagents.filter((sub) => sub.status === 'working') : [];
-      const ownCompleted = element.session.subagents.filter((sub) => !sessionWorking || sub.status === 'stopped');
-      const working = [...ownWorking, ...nested.filter((sub) => sub.status === 'working')];
-      const completed = [...ownCompleted, ...nested.filter((sub) => sub.status === 'stopped')];
+      const { working, completed } = splitSubagentsByStatus(element.session, nested);
 
       const groups: SubAgentGroupTreeItem[] = [];
       if (working.length > 0) {

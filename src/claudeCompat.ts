@@ -7,7 +7,7 @@
  *
  * Bump this after validating the parser against a new Claude Code release.
  */
-export const KNOWN_COMPATIBLE_CLAUDE_VERSION = '2.1.222';
+export const KNOWN_COMPATIBLE_CLAUDE_VERSION = '2.1.223';
 
 /** Compare two dotted numeric versions. Returns -1 if a < b, 1 if a > b, 0 if equal. Non-numeric
  * or missing segments compare as 0, so "2.1" == "2.1.0". Never throws. */

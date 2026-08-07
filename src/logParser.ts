@@ -149,7 +149,8 @@ export class LogParser {
         session.claudeVersion = json.version;
       }
       this.parseTimestamp(json, session, stats);
-      this.parseGitBranch(json, session);
+      this.projectPaths.detectGitBranch(json, session);
+      this.projectPaths.detectWorktreeName(json, session);
       this.projectPaths.detectProjectPath(json, session);
       this.detectSessionModel(json, session);
 
@@ -231,7 +232,10 @@ export class LogParser {
     // A rename the user typed wins over anything derived. A later rename still applies (each one
     // is its own entry), but no generated title may take it back — hence the latch rather than
     // relying on assignment order, since an `ai-title` can land after the rename.
-    const renamed = extractRenamedTitle(json);
+    // `session.worktreeName` (set by projectPaths.detectWorktreeName from an earlier
+    // `worktree-state` entry) lets extractRenamedTitle reject Claude Code's own auto-stamped
+    // custom-title instead of latching it as if the user had renamed the session.
+    const renamed = extractRenamedTitle(json, session.worktreeName);
     if (renamed) {
       // Not truncated at 60 like a derived title below: this is the exact text the user typed,
       // and it is what Claude Code itself shows. The tree view elides anything too long.
@@ -281,14 +285,6 @@ export class LogParser {
     // Assistant turns carry the main-loop model (e.g. "claude-sonnet-5"). Keep the latest.
     if (json.type === 'assistant' && json.message?.model) {
       session.model = json.message.model;
-    }
-  }
-
-  private parseGitBranch(json: LogEntry, session: Session): void {
-    if (json.gitBranch) {
-      session.gitBranch = json.gitBranch;
-    } else if (json.git && typeof json.git.branch === 'string') {
-      session.gitBranch = json.git.branch;
     }
   }
 

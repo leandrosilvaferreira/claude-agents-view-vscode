@@ -1,3 +1,5 @@
+import { normalizeForKey } from './sessionDedupe';
+
 export interface LogEntryForName {
   role?: string;
   type?: string;
@@ -38,10 +40,46 @@ function isScaffold(text: string): boolean {
  * The title the user typed to rename the session, when this entry is a rename. Claude Code writes
  * one `type:"custom-title"` entry per rename, so the last one in the transcript is the name it
  * shows — and being an explicit human choice, it outranks anything derived or generated.
+ *
+ * Since Claude Code 2.1.223, a session also gets a `custom-title` entry auto-stamped to its own
+ * git-worktree name every time it enters that worktree — the same entry type, indistinguishable
+ * by shape from a real rename. Trusting it made every session that ever entered a given worktree
+ * share the identical sessionTitle, collapsing genuinely distinct sessions onto one
+ * sessionDedupe.getDedupeKey() slot (real capture: `{"type":"custom-title",
+ * "customTitle":"structured-logging",...}`, byte-identical across four unrelated sessions that
+ * had all entered the "structured-logging" worktree). `knownWorktreeName` is the name the SAME
+ * transcript already logged via its own `type:"worktree-state"` entry (projectPathResolver.ts's
+ * detectWorktreeName tracks it on `session.worktreeName` as a one-way latch — see its KNOWN
+ * LIMITATION comment for why); a match means this is Claude Code's own auto-label, not user
+ * intent, so it's rejected here — the caller then falls back to whatever the first-real-prompt/
+ * ai-title logic would otherwise produce. Mirrors the
+ * SCAFFOLD_PREFIXES handling above: same class of "don't trust it just because it arrived as a
+ * custom-title entry" problem, different trigger.
+ *
+ * The match is via normalizeForKey, not raw `===`: Claude Code substitutes `/` with `+` when it
+ * stamps a slash-containing worktree name into customTitle — real capture, two unrelated
+ * sessions: `worktreeName:"feat/42-example-generic-feature-name"` stamped as
+ * `customTitle:"feat+42-example-generic-feature-name"`. A slash-containing name is the
+ * mainstream case (`feature/…`, `fix/…`, `chore/…`-derived worktrees), not an edge case, so raw
+ * equality missed most real auto-stamps and reopened the exact collision this function exists to
+ * close. normalizeForKey already folds any run of non-alphanumeric characters (covering both `/`
+ * and `+`, whatever else Claude Code might substitute) — reusing it here instead of hand-rolling
+ * a narrower `/`-only replace is deliberate: it doesn't require enumerating every substitution
+ * Claude Code happens to apply, only the ones observed so far. Its lowercasing/diacritic-folding
+ * is slightly more aggressive than this comparison strictly needs, so a coincidental later user
+ * rename that normalizes identically to a past worktree name would also be (wrongly) rejected —
+ * accepted here since sessionDedupe.getDedupeKey() already tolerates that exact class of
+ * near-miss for its own, primary purpose.
  */
-export function extractRenamedTitle(json: { type?: string; customTitle?: string }): string | null {
+export function extractRenamedTitle(
+  json: { type?: string; customTitle?: string },
+  knownWorktreeName?: string,
+): string | null {
   if (json.type !== 'custom-title' || typeof json.customTitle !== 'string') return null;
-  return json.customTitle.trim() || null;
+  const title = json.customTitle.trim();
+  if (!title) return null;
+  if (knownWorktreeName && normalizeForKey(title) === normalizeForKey(knownWorktreeName)) return null;
+  return title;
 }
 
 export function extractSessionName(json: LogEntryForName): string | null {

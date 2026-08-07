@@ -33,4 +33,7 @@ export interface Session {
   lastEntryIsInterruption?: boolean; // Last user turn was Claude Code's own interruption sentinel (Esc), not a real prompt — overrides the 'user' reading of lastEntryType above. Recomputed on every message-bearing turn like lastEntryType, so it self-clears the moment a genuine next turn lands.
   entrypoint?: string; // How the session started: 'claude-vscode'/'cli' = human, 'sdk-*' = spawned agent
   claudeVersion?: string; // Claude Code version stamped on the transcript (`version` field), for compat checks
+  worktreeName?: string; // Bare git-worktree name from the last `type:"worktree-state"` entry seen — lets
+  // nameExtractor.extractRenamedTitle recognize Claude Code's own auto-stamped `custom-title` (set to this
+  // same name on worktree entry) instead of trusting it as a real user rename.
 }

@@ -58,6 +58,13 @@ export interface LogEntry {
   TargetFile?: string;
   aiTitle?: string;
   // Title the user typed to rename the session, on a `type: 'custom-title'` entry. Rewritten
-  // on every rename, so the last one in the transcript is the one in effect.
+  // on every rename, so the last one in the transcript is the one in effect. Claude Code also
+  // auto-stamps this same entry type to the session's own worktree name on worktree entry — see
+  // nameExtractor.ts's extractRenamedTitle for why that must not be trusted as a real rename.
   customTitle?: string;
+  // Present on a `type: 'worktree-state'` entry, written when a session enters a git worktree.
+  // `worktreeName` is the bare worktree name Claude Code later re-uses verbatim as an
+  // auto-stamped `customTitle` (see above) — tracked on `session.worktreeName` so that stamp can
+  // be recognized and ignored.
+  worktreeSession?: { worktreeName?: string };
 }

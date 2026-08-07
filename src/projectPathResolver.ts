@@ -4,13 +4,16 @@ import { LogEntry } from './transcriptEntry';
 import { Session } from './types';
 
 /**
- * Works out which project a transcript belongs to.
+ * Works out the repo context a transcript belongs to: which project, which git branch, and
+ * (Claude Code only) which git worktree.
  *
- * Neither brand states it outright. Claude Code encodes the project directory into the folder
- * name and stamps the real `cwd` on every entry; Antigravity states it only inside prose fields
- * ("Active Document: …") or a tool call's `Cwd`. Both cases fall back to walking up the file
- * system for a project marker. Kept out of LogParser because none of it depends on the
- * incremental-read machinery — it only ever looks at one entry, or one path, at a time.
+ * Neither brand states the project outright. Claude Code encodes the project directory into the
+ * folder name and stamps the real `cwd` on every entry; Antigravity states it only inside prose
+ * fields ("Active Document: …") or a tool call's `Cwd`. Both cases fall back to walking up the
+ * file system for a project marker. Branch and worktree name are simpler — Claude Code stamps
+ * `gitBranch` directly, and a `worktree-state` entry's `worktreeSession.worktreeName` needs no
+ * decoding. All three are kept out of LogParser because none of it depends on the incremental-read
+ * machinery — it only ever looks at one entry, or one path, at a time.
  */
 export class ProjectPathResolver {
   private decodedPathCache = new Map<string, string>();
@@ -46,6 +49,39 @@ export class ProjectPathResolver {
     // 3. Extract from TargetFile
     if (json.TargetFile) {
       session.projectPath = this.findProjectRoot(json.TargetFile);
+    }
+  }
+
+  public detectGitBranch(json: LogEntry, session: Session): void {
+    if (json.gitBranch) {
+      session.gitBranch = json.gitBranch;
+    } else if (json.git && typeof json.git.branch === 'string') {
+      session.gitBranch = json.git.branch;
+    }
+  }
+
+  /** Tracks the bare git-worktree name from a `type:"worktree-state"` entry (real shape:
+   * `{"type":"worktree-state","worktreeSession":{"worktreeName":"structured-logging",...}}`) so
+   * logParser.ts's detectSessionTitle can recognize Claude Code's own later auto-stamped
+   * `custom-title` (set to this same name) instead of trusting it as a real user rename. See
+   * nameExtractor.ts's extractRenamedTitle.
+   *
+   * KNOWN LIMITATION, deliberately not "fixed": this never clears, so session.worktreeName
+   * latches to the LAST worktree entered for the rest of the session's life — a later GENUINE
+   * user rename that happens to coincide with a past worktree's name would be wrongly rejected as
+   * an auto-stamp echo. A clearing rule keyed on "relocated back to a bare, non-worktree cwd" was
+   * tried and reverted: real evidence (session `7ac34ece-fdce-41ad-9898-886d832035ec`) shows
+   * Claude Code can relocate a session OUT of a worktree to a bare cwd and then back — a worktree-state
+   * entry with `worktreeSession: null` in between — while STILL re-stamping the identical
+   * customTitle auto-echo afterward. Clearing on that "exit" signal made the SECOND, still-bogus
+   * auto-stamp get wrongly ACCEPTED as a real rename instead — reopening a worse form of the very
+   * bug this function exists to prevent. No reliable "permanently left this worktree" signal was
+   * found in the real corpus, so per this project's own architecture-no-public-transcript-schema
+   * lesson (don't speculatively engineer for a case real data doesn't confirm), the one-way latch
+   * stays as the deliberately-narrower, safer default. */
+  public detectWorktreeName(json: LogEntry, session: Session): void {
+    if (typeof json.worktreeSession?.worktreeName === 'string') {
+      session.worktreeName = json.worktreeSession.worktreeName;
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractSessionName } from '../nameExtractor';
+import { extractSessionName, extractRenamedTitle } from '../nameExtractor';
 
 // Regression: a recent Claude Code update records slash-command scaffolding as the first
 // `type:"user"` turns — an `isMeta:true` <local-command-caveat> block, then <command-name>/
@@ -59,5 +59,62 @@ describe('extractSessionName — slash-command scaffolding', () => {
   });
   it('returns the real user prompt', () => {
     expect(extractSessionName(realPrompt)).toBe('qual worktree você esta ?');
+  });
+});
+
+// Regression: Claude Code 2.1.223 auto-stamps a `type:"custom-title"` entry equal to the
+// session's own git-worktree name every time a session enters that worktree — the same entry
+// type this extractor otherwise treats as an explicit, permanent user rename. Trusting it made
+// every session that ever entered a given worktree collapse onto the identical sessionTitle, so
+// sessionDedupe.getDedupeKey() (keyed on type+projectPath+gitBranch+title) collided them onto one
+// slot — silently dropping every session but the isMoreRelevant winner, including the one
+// actively running subagents. Real capture (structured-logging worktree, four independent
+// sessions, four different real prompts, one identical stamped title): `{"type":"custom-title",
+// "customTitle":"structured-logging",...}`. Mirrors the SCAFFOLD_PREFIXES precedent above — same
+// class of "don't trust it just because it arrived as a custom-title entry" problem, different
+// trigger.
+describe('extractRenamedTitle — auto-stamped worktree label', () => {
+  it('accepts a real user rename', () => {
+    expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'Auth spike' })).toBe('Auth spike');
+  });
+
+  it("rejects an auto-stamped custom-title that exactly matches the session's own worktree name", () => {
+    expect(
+      extractRenamedTitle({ type: 'custom-title', customTitle: 'structured-logging' }, 'structured-logging'),
+    ).toBeNull();
+  });
+
+  // Regression (code-reviewer HIGH finding on the fix above): Claude Code substitutes `/` with
+  // `+` when it stamps a slash-containing worktree name into customTitle — real capture, two
+  // unrelated sessions on this machine: `worktreeName:"feat/42-example-generic-feature-
+  // name"` stamped as `customTitle:"feat+42-example-generic-feature-name"`, and
+  // `worktreeName:"fix/17-another-example-branch-name"` stamped as
+  // `customTitle:"fix+17-another-example-branch-name"`. A raw `===` check (the first
+  // pass at this fix) never recognized these as the auto-stamp, reopening the exact collision
+  // this function exists to close for any slash-containing worktree name — the mainstream case
+  // for `feature/…`/`fix/…`/`chore/…`-derived worktrees.
+  it('rejects an auto-stamped custom-title even when Claude Code substituted "/" with "+" in it', () => {
+    expect(
+      extractRenamedTitle(
+        { type: 'custom-title', customTitle: 'feat+42-example-generic-feature-name' },
+        'feat/42-example-generic-feature-name',
+      ),
+    ).toBeNull();
+    expect(
+      extractRenamedTitle(
+        { type: 'custom-title', customTitle: 'fix+17-another-example-branch-name' },
+        'fix/17-another-example-branch-name',
+      ),
+    ).toBeNull();
+  });
+
+  it('still accepts a custom-title that differs from the known worktree name', () => {
+    expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'Auth spike' }, 'structured-logging')).toBe(
+      'Auth spike',
+    );
+  });
+
+  it('accepts the custom-title unchanged when no worktree name is known yet', () => {
+    expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'structured-logging' })).toBe('structured-logging');
   });
 });
