@@ -1,5 +1,5 @@
 import { SubAgent } from './types';
-import { LogEntry } from './logParser';
+import type { LogEntry } from './logParser';
 
 /**
  * Since Claude Code 2.1.218 (observed on 2.1.222), a skill invoked with `context: fork` (e.g.

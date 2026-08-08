@@ -32,6 +32,7 @@ esbuild.js
 tsconfig.json
 vitest.config.ts
 eslint.config.mjs
+.jscpd.json
 .prettierrc
 .gitignore
 package-lock.json

@@ -95,25 +95,28 @@ function registerCommands(
   });
   context.subscriptions.push(enableCmd, disableCmd);
 
-  const openLogCmd = vscode.commands.registerCommand('claude-sessions-view.openSessionLog', (item: SessionTreeItem) => {
-    logDebug(`command(): openSessionLog for ${item?.id || 'unknown'}`);
-    if (item?.session?.logFilePath) {
-      if (fs.existsSync(item.session.logFilePath)) {
-        void vscode.workspace
-          .openTextDocument(vscode.Uri.file(item.session.logFilePath))
-          .then((doc) => vscode.window.showTextDocument(doc));
-      } else {
-        void vscode.window.showErrorMessage(`Log file not found: ${item.session.logFilePath}`);
+  const openLogCmd = vscode.commands.registerCommand(
+    'claude-sessions-view.openSessionLog',
+    (item?: SessionTreeItem) => {
+      logDebug(`command(): openSessionLog for ${item?.id || 'unknown'}`);
+      if (item?.session.logFilePath) {
+        if (fs.existsSync(item.session.logFilePath)) {
+          void vscode.workspace
+            .openTextDocument(vscode.Uri.file(item.session.logFilePath))
+            .then((doc) => vscode.window.showTextDocument(doc));
+        } else {
+          void vscode.window.showErrorMessage(`Log file not found: ${item.session.logFilePath}`);
+        }
       }
-    }
-  });
+    },
+  );
   context.subscriptions.push(openLogCmd);
 
   const openProjectCmd = vscode.commands.registerCommand(
     'claude-sessions-view.openProject',
-    (item: SessionTreeItem) => {
+    (item?: SessionTreeItem) => {
       logDebug(`command(): openProject for ${item?.id || 'unknown'}`);
-      if (item?.session?.projectPath) {
+      if (item?.session.projectPath) {
         if (fs.existsSync(item.session.projectPath)) {
           void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(item.session.projectPath), true);
         } else {

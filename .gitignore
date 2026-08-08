@@ -37,3 +37,7 @@ vault-obsidian/
 .claude/scripts/package-lock.json
 # aia-harness
 .claude/.aia-harness-pending/
+
+# Fixture pair written by src/test/lintRules.test.ts to prove import-x/no-cycle
+# still fires; removed in afterAll, ignored here so a crashed run cannot commit one.
+src/zzLintProbe*.ts

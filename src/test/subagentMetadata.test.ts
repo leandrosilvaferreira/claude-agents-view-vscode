@@ -82,7 +82,9 @@ describe('enrichSubagentMetadata', () => {
     const sub = makeSubagent();
     const session = makeSession({ subagents: [sub] });
 
-    expect(() => enrichSubagentMetadata(session)).not.toThrow();
+    expect(() => {
+      enrichSubagentMetadata(session);
+    }).not.toThrow();
     expect(sub.name).toBe('Agent');
     expect(sub.model).toBeUndefined();
   });
@@ -241,7 +243,9 @@ describe('enrichSubagentMetadata', () => {
       });
       const session = makeSession({ subagents: [sub] });
 
-      expect(() => enrichSubagentMetadata(session)).not.toThrow();
+      expect(() => {
+        enrichSubagentMetadata(session);
+      }).not.toThrow();
       expect(sub.agentId).toBe('a2e15c98935a695a32');
       expect(sub.name).toBe('code-review');
     });

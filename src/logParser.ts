@@ -38,6 +38,8 @@ const INTERRUPTION_TEXTS = new Set<string>([
   '[Request interrupted by user for tool use]',
 ]);
 
+const CLAUDE_CODE_BRAND = 'claude-code' as const;
+
 export class LogParser {
   private cache = new Map<string, { lastReadOffset: number; session: Session }>();
   private projectPaths = new ProjectPathResolver();
@@ -200,7 +202,12 @@ export class LogParser {
     session.lastEntryIsInterruption = this.isInterruptionEntry(json);
     const blocks = Array.isArray(json.message.content) ? json.message.content : null;
     if (blocks) {
-      session.lastEntryIsThinking = blocks.some((block) => block?.type === 'thinking');
+      // LogEntry types a content block as always-present, but this is untrusted transcript
+      // data — a real line can carry a null/undefined element — so the callback param is typed
+      // to match that reality rather than the (optimistic) shared LogEntry shape.
+      session.lastEntryIsThinking = blocks.some(
+        (block: { type: string } | null | undefined) => block?.type === 'thinking',
+      );
     }
   }
 
@@ -292,7 +299,7 @@ export class LogParser {
     const fileBasename = path.basename(filePath, '.jsonl');
 
     let projectDir: string;
-    if (type === 'claude-code') {
+    if (type === CLAUDE_CODE_BRAND) {
       const relative = path.relative(this.claudeProjectsPath, filePath);
       projectDir = relative.split(path.sep)[0] || '';
     } else {
@@ -304,12 +311,12 @@ export class LogParser {
     }
 
     const decodedPath =
-      type === 'claude-code'
+      type === CLAUDE_CODE_BRAND
         ? this.projectPaths.decodeClaudeProjectPath(projectDir)
         : path.dirname(path.dirname(path.dirname(filePath)));
-    const sessionId = type === 'claude-code' ? fileBasename : projectDir;
+    const sessionId = type === CLAUDE_CODE_BRAND ? fileBasename : projectDir;
     const projectName =
-      type === 'claude-code' ? path.basename(decodedPath) || projectDir : `Session ${projectDir.substring(0, 8)}`;
+      type === CLAUDE_CODE_BRAND ? path.basename(decodedPath) || projectDir : `Session ${projectDir.substring(0, 8)}`;
 
     return {
       id: sessionId,

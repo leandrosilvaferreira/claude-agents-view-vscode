@@ -17,6 +17,10 @@ import { splitSubagentsByStatus } from './subagentGrouping';
 
 type TreeItemType = BrandTreeItem | MessageTreeItem | SessionTreeItem | SubAgentGroupTreeItem | SubAgentTreeItem;
 
+// Session.type / BrandTreeItem.brand discriminator value for the Claude Code brand, shared by
+// the filter/construct/watch call sites below so they can't drift out of sync.
+const CLAUDE_CODE_BRAND = 'claude-code' as const;
+
 export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItemType> {
   private _onDidChangeTreeData: vscode.EventEmitter<TreeItemType | undefined | null | void> = new vscode.EventEmitter<
     TreeItemType | undefined | null | void
@@ -164,10 +168,10 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     // Brand nodes (only shown when active sessions exist for that brand).
     const filteredSessions = this.getVisibleSessions();
     const brands: BrandTreeItem[] = [];
-    const claudeSessions = filteredSessions.filter((s) => s.type === 'claude-code');
+    const claudeSessions = filteredSessions.filter((s) => s.type === CLAUDE_CODE_BRAND);
     const antigravitySessions = filteredSessions.filter((s) => s.type === 'antigravity');
     if (claudeSessions.length > 0) {
-      brands.push(new BrandTreeItem('claude-code', claudeSessions));
+      brands.push(new BrandTreeItem(CLAUDE_CODE_BRAND, claudeSessions));
     }
     if (antigravitySessions.length > 0) {
       brands.push(new BrandTreeItem('antigravity', antigravitySessions));
@@ -220,11 +224,11 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
         );
         claudeWatcher.onDidChange((uri) => {
           logDebug(`watcher: Claude file change detected: ${uri.fsPath}`);
-          this.handleFileChange(uri.fsPath, 'claude-code');
+          this.handleFileChange(uri.fsPath, CLAUDE_CODE_BRAND);
         });
         claudeWatcher.onDidCreate((uri) => {
           logDebug(`watcher: Claude file create detected: ${uri.fsPath}`);
-          this.handleFileChange(uri.fsPath, 'claude-code');
+          this.handleFileChange(uri.fsPath, CLAUDE_CODE_BRAND);
         });
         this.watchers.push(claudeWatcher);
       } else {

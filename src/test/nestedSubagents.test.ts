@@ -145,7 +145,9 @@ describe('refreshNestedSubagents', () => {
     const parent = makeSubagent({ id: 'toolu_parent3', agentId: 'parent-agent-3' });
     const session = makeSession({ subagents: [parent] });
 
-    expect(() => refreshNestedSubagents(session)).not.toThrow();
+    expect(() => {
+      refreshNestedSubagents(session);
+    }).not.toThrow();
     expect(parent.children).toBeUndefined();
   });
 

@@ -1,5 +1,5 @@
 import { SubAgent } from './types';
-import { LogEntry } from './logParser';
+import type { LogEntry } from './logParser';
 import { detectForkedSkillLaunch } from './forkedSkillDetector';
 
 /** Detect subagent starts/completions from one log entry and mutate the running map. */
