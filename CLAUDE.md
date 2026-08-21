@@ -116,8 +116,16 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   view + 5 commands, gates monitoring on the `claudeAgentsMonitor.enabled` setting,
   delays the first scan ~10s so it doesn't race Claude Code for the log files.
 - **sessionTreeDataProvider.ts** — orchestrator + `TreeDataProvider`: owns the session
-  Map, file watchers, 15s refresh timer, `lsof` active-status detection (macOS/Linux
-  only), and calls dedupe + background-agent nesting before feeding the tree.
+  Map, file watchers, 15s refresh timer (delegates the per-session refresh work to
+  `sessionStatusRefresh.ts`), `lsof` active-status detection (macOS/Linux only), and
+  calls dedupe + background-agent nesting before feeding the tree.
+- **sessionStatusRefresh.ts** — the per-session refresh loop run on every 15s tick and
+  file-change refresh: status, then subagent metadata enrichment, then grandchild
+  attachment, in that order — enrichment must run immediately before nesting so a
+  freshly-available `agentId` is picked up the same tick, not the next transcript parse
+  (see its own doc comment). Extracted out of `sessionTreeDataProvider.ts` to stay under
+  this repo's 350-line file budget and because vscode-free code here is directly
+  unit-testable.
 - **sessionScanner.ts** — discovers Claude (`~/.claude/projects/**/*.jsonl`) and
   Antigravity (`~/.gemini/.../transcript.jsonl`) log files. Pure, never throws.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads
@@ -140,12 +148,15 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   directories (the transcript's own and the one `projectPath` encodes to — they differ
   inside a worktree), dedupes across them, and caches by filename set so a refresh that
   changed nothing re-parses nothing.
-- **subagentMetadata.ts** — fills a detected subagent's real name/model from the sidecar,
-  joined on `toolUseId`. Runs on parse (`logParser`).
+- **subagentMetadata.ts** — fills a detected subagent's real name/model/`agentId` from
+  the sidecar, joined on `toolUseId`. Runs on parse (`logParser`) AND on every refresh
+  tick (`sessionStatusRefresh.ts`), immediately before nested-subagent attachment — the
+  latter exists so `agentId` isn't stuck unfilled for a subagent's entire live run.
 - **nestedSubagents.ts** — attaches grandchildren (subagents launched by a subagent) via
   the sidecar's `parentAgentId`, one level deep, with a best-effort mtime status. Runs on
-  the refresh tick, NOT on parse: a background subagent writes only two lines to the
-  parent transcript, so parse-driven refresh would go stale exactly while it works.
+  the refresh tick (via `sessionStatusRefresh.ts`), NOT on parse: a background subagent
+  writes only two lines to the parent transcript, so parse-driven refresh would go stale
+  exactly while it works.
 - **nameExtractor.ts** — derives the session title from the first real user prompt,
   skipping slash-command scaffolding and `isMeta` turns.
 - **sessionDedupe.ts** — pure dedupe key, stable relevance ranking,

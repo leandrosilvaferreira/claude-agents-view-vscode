@@ -16,7 +16,12 @@ do NOT share a launch shape:
    Completion carries only `<task-id>` (the agentId); `<tool-use-id>` is absent.
 3. **In-process teammate** (agent teams) — a real `Agent` tool_use, but inside the _forked
    agent's own_ transcript, so the parent transcript never sees it. Sidecar has
-   `parentAgentId` + `taskKind:"in_process_teammate"`, no `toolUseId`.
+   `parentAgentId` + `taskKind:"in_process_teammate"`, no `toolUseId`, plus fields
+   `subagentDetector.ts` never reads: `name`, `teamName`, `color`, `permissionMode`,
+   `planModeRequired`, and `customAgentType` — the REAL specialist type (`agentType`
+   on a teammate sidecar is only the per-task label, e.g. `"angle-a-linebyline"`, not
+   the specialist; `customAgentType` holds `"code-reviewer"` etc.). Confirmed on a real
+   sidecar 2026-08-21 — see [[reference-transcript-subagent-layout]] for the full shape.
 
 Sidecars for (2) and (3) have **no `toolUseId`**, so `subagentMetadata.readSidecarsById`
 (which indexes only by `toolUseId`) silently ignores them — name/model must come from the
@@ -36,5 +41,14 @@ hinted why. Cost three rounds of on-disk evidence to pin down.
 came from. Never assume a subagent implies a `tool_use`. Gate any new
 `<forked-skill-launch>` reading on `type === 'system'` + the **top-level** `content` string —
 agent reports paste that tag verbatim into message text, and reading it via `getEntryText`
-fabricates phantom subagents. See [[reference-transcript-subagent-layout]] and
-[[architecture-no-public-transcript-schema]].
+fabricates phantom subagents (this exact false-positive was caught live during the
+2026-08-21 audit: a debugger subagent's own prompt/report, quoting this file, matched a
+naive `<forked-skill-launch>` grep). A grandchild is silently invisible forever when its
+sidecar's `parentAgentId` resolves to nothing known (deliberate, tested) — in an
+audited 14-day corpus every real in-process-teammate sidecar's `parentAgentId` pointed at
+an already-detected forked-skill parent, never at a top-level session directly, so this
+gap is real but so far unobserved in practice. It WAS also silently invisible
+_transiently_ whenever the parent hadn't yet had its own `agentId` sidecar-enriched,
+because enrichment and grandchild-attachment ran on two different cadences — fixed
+2026-08-21, see [[architecture-enrichment-runs-only-on-parse-not-tick]]. See
+[[reference-transcript-subagent-layout]] and [[architecture-no-public-transcript-schema]].

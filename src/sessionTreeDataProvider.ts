@@ -7,13 +7,13 @@ import { LogParser } from './logParser';
 import { scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
 import { assembleVisibleSessions } from './sessionAssembly';
-import { applyNestedAgentLiveness, upsertIfMoreRelevant } from './sessionDedupe';
-import { computeSessionStatus, getOpenLogFiles } from './sessionActivity';
+import { upsertIfMoreRelevant } from './sessionDedupe';
+import { getOpenLogFiles } from './sessionActivity';
 import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
 import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible } from './claudeCompat';
 import { getNestedSubAgentChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
-import { refreshNestedSubagents } from './nestedSubagents';
 import { splitSubagentsByStatus } from './subagentGrouping';
+import { refreshSessionStatuses } from './sessionStatusRefresh';
 
 type TreeItemType = BrandTreeItem | MessageTreeItem | SessionTreeItem | SubAgentGroupTreeItem | SubAgentTreeItem;
 
@@ -328,19 +328,20 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     void vscode.window.showWarningMessage(msg);
   }
 
+  /**
+   * Runs on every 15s auto-refresh tick (startAutoRefresh) and every file-change-triggered
+   * refresh (handleFileChange, loadSessions). `getOpenLogFiles` is the only part of this that
+   * needs to be here rather than in the pure helper: it shells out to `lsof`, so it stays async
+   * and colocated with the rest of this vscode-layer class. The actual per-session status and
+   * subagent-metadata refresh logic — including WHY enrichSubagentMetadata must run there
+   * immediately before refreshNestedSubagents on every tick, not only when a transcript is
+   * re-parsed — lives in sessionStatusRefresh.ts's refreshSessionStatuses; see that function's
+   * own doc comment.
+   */
   private async updateActiveStatuses(): Promise<void> {
     try {
       const openFiles = await getOpenLogFiles(this.homeDir);
-      const sessions = Array.from(this.sessions.values());
-
-      for (const session of sessions) {
-        session.status = computeSessionStatus(session, openFiles);
-        refreshNestedSubagents(session);
-      }
-      // computeSessionStatus only sees same-file subagents; fold in cross-file nested agents
-      // (background agents in their own transcript, matched by project+branch) so a launcher
-      // doesn't render 'stopped' while its own "Working Agents" group shows a live child.
-      applyNestedAgentLiveness(sessions);
+      refreshSessionStatuses(Array.from(this.sessions.values()), openFiles);
     } catch (err) {
       logDebug(`SessionTreeDataProvider: updateActiveStatuses() failed: ${String(err)}`);
     }

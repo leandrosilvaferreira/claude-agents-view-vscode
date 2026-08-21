@@ -21,13 +21,19 @@ import { SidecarMetadata, candidateMetadataDirs, readAllSidecars } from './sidec
  * any existing resume test: subagentDetector.test.ts builds its `currentSubagents` maps directly
  * from literal SubAgent objects and never calls into this module, so it's unaffected either way.
  *
- * Called from logParser.ts only when the session's OWN transcript grows — correct here, since
- * this only ever needs to run once per subagent, right after it's first detected (or, for
- * agentId, once its sidecar exists — see needsSidecarData for why that's usually the very next
- * parse pass, not a sustained cost). Grandchild ("subagent launched by a subagent") attachment
- * deliberately does NOT live in this function — it has the opposite requirement (its data doesn't
- * come from this transcript at all) and lives in nestedSubagents.ts's refreshNestedSubagents
- * instead, called on a completely different cadence. See that file's doc comment for why.
+ * Called from two places on two different cadences: logParser.ts, whenever the session's OWN
+ * transcript grows (the original caller — needed since a subagent's name/model become knowable
+ * as soon as it's first detected), and sessionStatusRefresh.ts's refreshSessionStatuses, on every
+ * 15s/file-change tick, immediately before refreshNestedSubagents (added 2026-08-21: a subagent's
+ * `agentId` — see needsSidecarData — commonly wasn't filled until its own run finished, since the
+ * parent transcript often doesn't grow again until then, which left refreshNestedSubagents' join
+ * unable to match any grandchild for the subagent's entire live run; see sessionStatusRefresh.ts's
+ * own doc comment for the full reasoning). Both calls are cheap once a subagent has nothing left
+ * to enrich (needsSidecarData's early-exit), so running it more often than strictly necessary from
+ * either caller is by design, not an oversight. Grandchild ("subagent launched by a subagent")
+ * attachment deliberately does NOT live in this function — it has the opposite requirement (its
+ * data doesn't come from this transcript at all) and lives in nestedSubagents.ts's
+ * refreshNestedSubagents instead. See that file's doc comment for why.
  */
 export function enrichSubagentMetadata(session: Session): void {
   const candidates = session.subagents.filter(needsSidecarData);

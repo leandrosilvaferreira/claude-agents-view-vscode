@@ -6,9 +6,13 @@ import { IDLE_CEILING, RECENT_WRITE } from './sessionActivity';
 /**
  * Attaches/refreshes "grandchildren" — subagents launched BY a subagent, invisible to the
  * session transcript because they never appear there (see attachNestedSubagents for the join
- * itself). Deliberately called from sessionTreeDataProvider.ts's updateActiveStatuses() (the 15s
- * tick, and every file-change-triggered refresh) instead of from the transcript parse the way
- * subagentMetadata.ts's enrichSubagentMetadata is.
+ * itself). Deliberately called from sessionStatusRefresh.ts's refreshSessionStatuses (invoked by
+ * sessionTreeDataProvider.ts's updateActiveStatuses() on the 15s tick, and every file-change-
+ * triggered refresh) instead of from the transcript parse the way subagentMetadata.ts's
+ * enrichSubagentMetadata primarily is — though as of 2026-08-21 that function ALSO runs
+ * immediately before this one, on this same tick, precisely so the `sub.agentId` this function's
+ * join depends on is available without waiting for the parent transcript to grow; see
+ * sessionStatusRefresh.ts's own doc comment for why that ordering matters.
  *
  * That split matters: a backgrounded subagent writes exactly two lines to the PARENT transcript
  * — the launch ACK and, much later, its own <task-notification> (subagentDetector.ts) — with a
@@ -85,15 +89,24 @@ function groupByParentAgentId(sidecars: SidecarMetadata[]): Map<string, SidecarM
 /** Builds a grandchild SubAgent straight from its sidecar — unlike a level-1 subagent, there is
  * no tool_use block to detect it from (its launch happened inside the PARENT's own transcript,
  * which this extension deliberately never reads), so every field comes from the sidecar alone.
- * Status is computed HERE, at build time, never cached — see computeChildStatus. Falls back to a
- * random id in the (essentially never hit) case where the filename didn't match the expected
- * agent-<id>.meta.json shape. */
+ * `name` prefers the sidecar's own custom `name` over the generic `agentType`, mirroring how a
+ * level-1 subagent already prefers its launch tool_use's own `name` input over agentType — without
+ * this, every member of a named parallel fan-out of grandchildren renders under the same generic
+ * `agentType` label, indistinguishable from its siblings (real corpus: 34/34 sampled grandchildren
+ * with `name` set had `name !== agentType`, e.g. `angle-a-linebyline` vs. the real specialist
+ * `code-reviewer`). Uses `||`, not `??`, for `name` and `task` — an empty string is a launch with
+ * an explicitly blank `name`/`description` input, not a meaningful value, and must fall through
+ * the same way `subagentDetector.ts`'s `getClaudeName` already treats a level-1 subagent's blank
+ * `name` (`block.input?.name || 'Agent'`); `??` alone would let `''` through and render a blank
+ * tree label (code-review finding, 2026-08-21). Status is computed HERE, at build time, never
+ * cached — see computeChildStatus. Falls back to a random id in the (essentially never hit) case
+ * where the filename didn't match the expected agent-<id>.meta.json shape. */
 function toChildSubAgent(meta: SidecarMetadata): SubAgent {
   return {
     id: meta.agentId ?? meta.toolUseId ?? Math.random().toString(),
     agentId: meta.agentId,
-    name: meta.agentType ?? 'Agent',
-    task: meta.description ?? 'Delegate task',
+    name: meta.name || meta.agentType || 'Agent',
+    task: meta.description || 'Delegate task',
     status: computeChildStatus(meta),
     model: meta.model,
   };
