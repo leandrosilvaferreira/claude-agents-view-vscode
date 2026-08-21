@@ -94,15 +94,19 @@ function groupByParentAgentId(sidecars: SidecarMetadata[]): Map<string, SidecarM
  * this, every member of a named parallel fan-out of grandchildren renders under the same generic
  * `agentType` label, indistinguishable from its siblings (real corpus: 34/34 sampled grandchildren
  * with `name` set had `name !== agentType`, e.g. `angle-a-linebyline` vs. the real specialist
- * `code-reviewer`). Status is computed HERE, at build time, never cached — see computeChildStatus.
- * Falls back to a random id in the (essentially never hit) case where the filename didn't match
- * the expected agent-<id>.meta.json shape. */
+ * `code-reviewer`). Uses `||`, not `??`, for `name` and `task` — an empty string is a launch with
+ * an explicitly blank `name`/`description` input, not a meaningful value, and must fall through
+ * the same way `subagentDetector.ts`'s `getClaudeName` already treats a level-1 subagent's blank
+ * `name` (`block.input?.name || 'Agent'`); `??` alone would let `''` through and render a blank
+ * tree label (code-review finding, 2026-08-21). Status is computed HERE, at build time, never
+ * cached — see computeChildStatus. Falls back to a random id in the (essentially never hit) case
+ * where the filename didn't match the expected agent-<id>.meta.json shape. */
 function toChildSubAgent(meta: SidecarMetadata): SubAgent {
   return {
     id: meta.agentId ?? meta.toolUseId ?? Math.random().toString(),
     agentId: meta.agentId,
-    name: meta.name ?? meta.agentType ?? 'Agent',
-    task: meta.description ?? 'Delegate task',
+    name: meta.name || meta.agentType || 'Agent',
+    task: meta.description || 'Delegate task',
     status: computeChildStatus(meta),
     model: meta.model,
   };

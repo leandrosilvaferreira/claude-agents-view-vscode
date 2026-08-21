@@ -187,6 +187,25 @@ describe('refreshNestedSubagents', () => {
     expect(parent.children?.[0].name).toBe('angle-a-linebyline');
   });
 
+  it('falls through to agentType when the sidecar name is an explicit empty string, not a blank label (regression: code-review 2026-08-21)', () => {
+    // An empty string is a launch that set name: '' explicitly — not a meaningful custom name.
+    // `??` would keep '' as-is (only null/undefined trigger it) and render a blank tree row;
+    // must use `||` so this falls through the same way subagentDetector.ts's getClaudeName
+    // already treats a level-1 subagent's blank name (`block.input?.name || 'Agent'`).
+    writeSidecar(baseDirName, 'blank-name-child', {
+      agentType: 'code-reviewer',
+      name: '',
+      parentAgentId: 'parent-agent-15',
+    });
+    writeChildTranscript(baseDirName, 'blank-name-child', 1000);
+    const parent = makeSubagent({ id: 'toolu_p15', agentId: 'parent-agent-15' });
+    const session = makeSession({ subagents: [parent] });
+
+    refreshNestedSubagents(session);
+
+    expect(parent.children?.[0].name).toBe('code-reviewer');
+  });
+
   describe('worktree history (knownProjectDirs)', () => {
     it('still attaches a grandchild whose sidecar lives in a worktree directory the session has since left', () => {
       // Real corpus (14-day audit, 2026-08-21): 27 of 34 worktree-split sessions enter a
