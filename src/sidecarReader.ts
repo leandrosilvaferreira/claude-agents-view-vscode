@@ -62,13 +62,21 @@ export function encodeProjectDir(projectPath: string): string {
  * `projectPath` revert to the base cwd — silently and permanently losing the worktree directory
  * from this search the moment that happens, even though the sidecars are still sitting right
  * there on disk (real corpus, 14-day audit 2026-08-21: 27 of 34 worktree-split sessions ended
- * exactly this way). `knownProjectDirs` is appended to (deduped) in projectPathResolver.ts
- * wherever `projectPath` is set, precisely so this function can still find it here. Falls back to
+ * exactly this way). `knownProjectDirs` is maintained as a most-recently-used list (oldest first,
+ * current dir always last) in projectPathResolver.ts wherever `projectPath` is set. Falls back to
  * encoding `projectPath` directly when `knownProjectDirs` is empty/unset (e.g. a Session built
  * directly in a test without going through ProjectPathResolver), preserving the old single-dir
- * behavior for that case. Order matters: base dir first, then historical dirs oldest-to-newest,
- * so readAllSidecars' "later dir wins" dedup still prefers the most-recently-active directory —
- * exactly as it did back when there was only ever one historical dir to consider.
+ * behavior for that case.
+ *
+ * Order matters: `readAllSidecars`' "later dir wins" dedup should prefer the most-recently-active
+ * directory on an identity collision — including when that directory is the BASE one, e.g. a
+ * session that went base(A) → worktree(B) → base(A) and is currently back at A. `baseDir` is only
+ * prepended when it ISN'T already one of the MRU-ordered paths below, instead of unconditionally
+ * first — an earlier version of this function always put `baseDir` first regardless, which pinned
+ * it to the losing (non-most-recent) position on exactly that revisit-the-base case, even though
+ * `knownProjectDirs` itself had already correctly tracked A as the most recent entry (code-review
+ * finding, 2026-08-21). When `baseDir` genuinely is the fallback (no MRU history at all, or the
+ * session never left it), it's the only entry and this distinction is moot.
  */
 export function candidateMetadataDirs(session: Session): string[] {
   const baseDir = path.dirname(session.logFilePath);
@@ -79,7 +87,8 @@ export function candidateMetadataDirs(session: Session): string[] {
   const encodedDirs = session.knownProjectDirs?.length
     ? session.knownProjectDirs
     : [encodeProjectDir(session.projectPath)];
-  return [...new Set([baseDir, ...encodedDirs.map((dir) => path.join(claudeProjectsPath, dir))])];
+  const mruPaths = [...new Set(encodedDirs.map((dir) => path.join(claudeProjectsPath, dir)))];
+  return mruPaths.includes(baseDir) ? mruPaths : [baseDir, ...mruPaths];
 }
 
 /** Reads every sidecar under `<dir>/<sessionId>/subagents/` across all candidate dirs, in dir

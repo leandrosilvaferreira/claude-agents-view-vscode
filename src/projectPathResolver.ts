@@ -126,26 +126,31 @@ export class ProjectPathResolver {
   /**
    * The single place `projectPath` is ever assigned, across all five call sites in this class
    * (Claude Code's own `cwd` field, and the four Antigravity fallbacks in `detectProjectPath`).
-   * Also appends the newly-seen path's encoded sidecar directory to `session.knownProjectDirs`,
-   * deduped — see that field's own doc comment in types.ts for why: `projectPath` alone only ever
-   * reflects the LATEST cwd seen on this transcript, so a session that enters a git worktree,
-   * dispatches subagents there (their sidecars land ONLY under the worktree's own encoded
-   * directory — see sidecarReader.ts's candidateMetadataDirs), then leaves the worktree again
-   * would otherwise silently and permanently drop that directory from every future sidecar lookup
-   * the moment `projectPath` reverts to the base cwd. Real corpus (14-day audit, 2026-08-21): 27
-   * of 34 worktree-split sessions ended exactly this way. A raw `session.projectPath = x`
-   * assignment at any call site would reopen that bug for it.
+   * Also maintains `session.knownProjectDirs` as a most-recently-used list of every encoded
+   * sidecar directory `projectPath` has ever resolved to — a revisited dir moves to the end
+   * instead of staying at its first-seen position — see that field's own doc comment in types.ts
+   * for why: `projectPath` alone only ever reflects the LATEST cwd seen on this transcript, so a
+   * session that enters a git worktree, dispatches subagents there (their sidecars land ONLY
+   * under the worktree's own encoded directory — see sidecarReader.ts's candidateMetadataDirs),
+   * then leaves the worktree again would otherwise silently and permanently drop that directory
+   * from every future sidecar lookup the moment `projectPath` reverts to the base cwd. Real
+   * corpus (14-day audit, 2026-08-21): 27 of 34 worktree-split sessions ended exactly this way.
+   * The MRU ordering matters too, not just membership: `candidateMetadataDirs` relies on the
+   * MOST RECENT dir being LAST here so `readAllSidecars`' "later dir wins" dedup resolves to the
+   * most-recently-active directory on a collision — a base(A)→worktree(B)→base(A) session must
+   * end up `[B, A]` (A last, since it's current), not `[A, B]` (code-review finding, 2026-08-21: a
+   * plain push-if-new list left A in its original first-seen position on the revisit, so it never
+   * moved to the winning slot). That alone isn't sufficient, though: `candidateMetadataDirs` still
+   * has to avoid unconditionally forcing the base directory's path to the front regardless of this
+   * ordering — see that function's own doc comment for the companion half of this fix. A raw
+   * `session.projectPath = x` assignment at any call site would reopen the original drop bug for
+   * it, and a plain push-if-new would reopen this narrower ordering one.
    */
   private setProjectPath(session: Session, projectPath: string): void {
     session.projectPath = projectPath;
     const encodedDir = encodeProjectDir(projectPath);
-    if (session.knownProjectDirs) {
-      if (!session.knownProjectDirs.includes(encodedDir)) {
-        session.knownProjectDirs.push(encodedDir);
-      }
-    } else {
-      session.knownProjectDirs = [encodedDir];
-    }
+    const knownDirs = session.knownProjectDirs ?? [];
+    session.knownProjectDirs = [...knownDirs.filter((dir) => dir !== encodedDir), encodedDir];
   }
 
   private detectClaudeCodeProjectPath(json: LogEntry, session: Session): void {

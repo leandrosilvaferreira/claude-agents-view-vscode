@@ -6,9 +6,13 @@ import { IDLE_CEILING, RECENT_WRITE } from './sessionActivity';
 /**
  * Attaches/refreshes "grandchildren" — subagents launched BY a subagent, invisible to the
  * session transcript because they never appear there (see attachNestedSubagents for the join
- * itself). Deliberately called from sessionTreeDataProvider.ts's updateActiveStatuses() (the 15s
- * tick, and every file-change-triggered refresh) instead of from the transcript parse the way
- * subagentMetadata.ts's enrichSubagentMetadata is.
+ * itself). Deliberately called from sessionStatusRefresh.ts's refreshSessionStatuses (invoked by
+ * sessionTreeDataProvider.ts's updateActiveStatuses() on the 15s tick, and every file-change-
+ * triggered refresh) instead of from the transcript parse the way subagentMetadata.ts's
+ * enrichSubagentMetadata primarily is — though as of 2026-08-21 that function ALSO runs
+ * immediately before this one, on this same tick, precisely so the `sub.agentId` this function's
+ * join depends on is available without waiting for the parent transcript to grow; see
+ * sessionStatusRefresh.ts's own doc comment for why that ordering matters.
  *
  * That split matters: a backgrounded subagent writes exactly two lines to the PARENT transcript
  * — the launch ACK and, much later, its own <task-notification> (subagentDetector.ts) — with a

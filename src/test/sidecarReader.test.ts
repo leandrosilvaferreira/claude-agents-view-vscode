@@ -72,10 +72,28 @@ describe('sidecarReader', () => {
     it('returns every historical dir in knownProjectDirs, not just the current projectPath (regression: worktree left)', () => {
       // The real bug: projectPath has already reverted to the base cwd, so encoding it alone
       // would silently lose the worktree directory forever. knownProjectDirs is what keeps a
-      // session's full history of encoded dirs searchable after that reversion.
+      // session's full history of encoded dirs searchable after that reversion. Order here is
+      // [worktree, base] (not [base, worktree]) because knownProjectDirs is MRU-ordered and the
+      // session is CURRENTLY back at base — base must sort LAST so readAllSidecars' "later dir
+      // wins" dedup resolves an identity collision to the most-recently-active copy.
       const session = makeSession({
         projectPath: '/Users/dev/Projetos/demo', // reverted back to base
         knownProjectDirs: [worktreeDirName, baseDirName],
+      });
+
+      expect(candidateMetadataDirs(session)).toEqual([
+        path.join(claudeProjectsDir, worktreeDirName),
+        path.join(claudeProjectsDir, baseDirName),
+      ]);
+    });
+
+    it('sorts the base dir first when it is the LEAST recently active entry in knownProjectDirs', () => {
+      // Base dir has no special "always first" treatment — it lands wherever its own recency
+      // puts it. Here the session is currently in the worktree and base hasn't been revisited
+      // since, so base is oldest and correctly sorts first (worktree — current — sorts last).
+      const session = makeSession({
+        projectPath: '/Users/dev/Projetos/demo/.claude/worktrees/fix-thing',
+        knownProjectDirs: [baseDirName, worktreeDirName],
       });
 
       expect(candidateMetadataDirs(session)).toEqual([
@@ -84,14 +102,20 @@ describe('sidecarReader', () => {
       ]);
     });
 
-    it('always puts the transcript-own base dir first, regardless of knownProjectDirs order', () => {
-      // Preserves readAllSidecars' "later dir wins" contract: base dir must anchor position 0.
+    it('sorts the base dir LAST — winning the dedup — after a base → worktree → base revisit (regression: code-review 2026-08-21)', () => {
+      // The gap an earlier version of this function had: it always prepended baseDir first
+      // regardless of knownProjectDirs' own (correct) MRU order, so a session that returned to
+      // base could never have base win a collision against a worktree dir it had since left —
+      // even though knownProjectDirs itself already knew base was the most recent. Simulates
+      // setProjectPath's actual output for base(A) → worktree(B) → base(A): A moves to the end.
       const session = makeSession({
-        projectPath: '/Users/dev/Projetos/demo/.claude/worktrees/fix-thing',
-        knownProjectDirs: [baseDirName, worktreeDirName],
+        projectPath: '/Users/dev/Projetos/demo', // back at base, currently
+        knownProjectDirs: [worktreeDirName, baseDirName], // B touched first, A touched most recently
       });
 
-      expect(candidateMetadataDirs(session)[0]).toBe(path.join(claudeProjectsDir, baseDirName));
+      const dirs = candidateMetadataDirs(session);
+
+      expect(dirs[dirs.length - 1]).toBe(path.join(claudeProjectsDir, baseDirName));
     });
   });
 
