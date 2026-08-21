@@ -12,7 +12,9 @@
 
 - [Three subagent dispatch mechanisms](architecture-subagent-dispatch-mechanisms.md) — classic `Agent` tool_use vs `<forked-skill-launch>` (no tool_use, `<task-id>` completion) vs in-process teammates (invisible: grandchildren).
 
-- [Subagent transcript layout on disk](reference-transcript-subagent-layout.md) — subagents live in `<session-id>/subagents/agent-*.jsonl`; `scanClaudeSubSessions` looks in a `sessions/` dir that never exists; native worktree-entry leaves a same-id stub that can collide (fixed via `upsertIfMoreRelevant`).
+- [Subagent transcript layout on disk](reference-transcript-subagent-layout.md) — subagents live in `<session-id>/subagents/agent-*.jsonl`; `scanClaudeSubSessions` looks in a `sessions/` dir that never exists; native worktree-entry leaves a same-id stub that can collide (fixed via `upsertIfMoreRelevant`); worktree-dir sidecar loss after cwd reverts to base — fixed on `fix/subagent-visibility-gaps`.
+
+- [Enrichment runs on parse, nesting on the tick](architecture-enrichment-runs-only-on-parse-not-tick.md) — `enrichSubagentMetadata` (fills `agentId`) only ran when the parent transcript grew, leaving grandchildren unattached for a subagent's whole live run — fixed on `fix/subagent-visibility-gaps`.
 
 - [Import-graph lint rules fail silent](architecture-import-graph-lint-rules-fail-silent.md) — `import-x/no-cycle` needs `import-x/extensions`+`parsers`; import-x v4 needs `resolver-next`; boundaries needs `checkAllOrigins`.
 
