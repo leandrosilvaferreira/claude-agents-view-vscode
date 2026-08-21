@@ -1,32 +1,31 @@
 ---
 name: no-public-transcript-schema
-description: Claude Code's on-disk JSONL transcript format has no official schema — only real captured logs are reliable evidence
+description: Claude Code's on-disk JSONL transcript format has no official schema — confirmed via Anthropic's own docs, SDK source, and an open unanswered GitHub issue
 metadata:
   type: architecture
 ---
 
-Claude Code's `~/.claude/projects/<project>/<sessionId>.jsonl` transcript format (and the
-`<sessionId>/subagents/agent-*.jsonl` + `.meta.json` layout) is an undocumented internal
-implementation detail with no version field and no stability guarantee. Anthropic's own docs
-(code.claude.com/docs/en/sessions) say explicitly: it changes between CLI releases, and scripts
-that parse it directly can break on any release — the recommended path for external tooling is
-`/export`, not this parser. Community reverse-engineering projects exist (e.g.
-`daaain/claude-code-log` has a typed parser + round-trip schema-drift validator) but are
-themselves unofficial and non-authoritative.
+Claude Code's `~/.claude/projects/<project>/<sessionId>.jsonl` transcript (+
+`<sessionId>/subagents/agent-*.jsonl` / `.meta.json`) has no official schema — now confirmed from
+primary sources, not just inference. Anthropic's docs (code.claude.com/docs/en/sessions) say
+plainly: internal format, changes between releases, parsing it directly "can break on any
+release" — use `/export` instead. `@anthropic-ai/claude-agent-sdk`'s `getSessionMessages()` /
+`SessionMessage` does read the JSONL, but its own source (Python `types.py`) calls the on-disk
+shape "a large discriminated union... internal": it only decodes `type: user|assistant|system`
+(real files have 7+, e.g. `attachment`/`queue-operation`/`last-prompt`), payload is
+`message: unknown`, never touches `toolUseResult`/`userType`/`leafUuid` — not a usable parsing
+basis. Open feature request github.com/anthropics/claude-code#53516 (filed 2026-04-26, still open,
+zero maintainer reply as of 2026-08-21) asks for exactly this schema. Hook I/O, unlike the
+transcript, _is_ fully documented (code.claude.com/docs/en/hooks). Unofficial community schemas
+exist: `daaain/claude-code-log`, `vade-app/tjsonl`.
 
-**Why:** confirmed 2026-07-17 via official docs + web research (context7/WebSearch) while
-debugging why subagent status tracking silently broke — the code had assumed a top-level
-`tool_use_id` field that never exists in real transcripts (completions are nested inside
-`message.content[]`), and `message.content` can be a plain string instead of a block array on
-some turns. Neither shape is documented anywhere; both were only found by reading real log files
-under `~/.claude/projects/`.
+**Why:** confirmed 2026-07-17 debugging a subagent-status bug (assumed top-level `tool_use_id`
+that never exists; completions nest in `message.content[]`, sometimes a plain string not a block
+array); deepened 2026-08-21 via 2 parallel subagents (local CLI/SDK forensics + GitHub/docs
+primary-source research) after the user asked directly whether an official schema exists.
 
-**How to apply:** this project (`claude-agents-view-vscode`) has no schema to consult in advance.
-Before adding or changing any parsing logic in `logParser.ts` / `subagentDetector.ts` /
-`nameExtractor.ts`, pull a fresh real sample from `~/.claude/projects/` (or
-`~/.gemini/antigravity-ide/brain` for Antigravity) and inspect it directly — don't infer field
-shapes from memory, from the public Anthropic Messages API docs (those only cover the
-`message.content[]` block shapes, not the CLI's own wrapper fields like `type`, `gitBranch`,
-`ai-title`, `queue-operation`), or from this format having "always" looked a certain way in an
-older sample. Treat every assumption about the format as something that needs a real specimen to
-back it up.
+**How to apply:** no schema to consult in advance, official or SDK. Before touching
+`logParser.ts` / `subagentDetector.ts` / `nameExtractor.ts`, pull a fresh real sample from
+`~/.claude/projects/` (or `~/.gemini/antigravity-ide/brain` for Antigravity) and inspect it
+directly. Don't trust `SessionMessage`, the public Messages API docs, or an older sample as a
+stand-in.
