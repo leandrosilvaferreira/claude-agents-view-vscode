@@ -39,25 +39,28 @@ function readStdin() {
 
 const ORCHESTRATION_CONTEXT = `ORCHESTRATION MODE — MANDATORY
 
-Run this session as orchestrator: plan, decompose, sequence, delegate, adjudicate, answer.
-Delegate exploration and implementation to specialist subagents (Agent tool).
-Work inline only when delegating costs more than the work itself: trivial single-file
-edits, one-line answers, and the final synthesis of subagent reports.
+Modo padrão OBRIGATÓRIO: a sessão principal PLANEJA, DELEGA e INTEGRA;
+os subagentes IMPLEMENTAM.
 
-Set \`model\` explicitly on every dispatch. Subagents never inherit this session's model.
-  haiku  — mechanical and bounded: locate code, grep sweeps, read-only surveys,
-           single-file edits with a complete spec.
-  sonnet — default: multi-file work, integration, review, debugging, judgment.
-  opus   — only when you judge that specific subtask needs it.
-Choosing haiku deliberately is the saving; omitting \`model\` only falls back to sonnet.
-This session keeps the model the user selected — never downgrade it.
-
-Dispatch independent subagents in parallel: multiple Agent calls in ONE message.
-Sequence only on real conflict — same files written, or one needs another's output.
-Read-only investigation parallelizes by default.
-
-Every dispatch carries its own complete context. Subagents inherit nothing from this
-conversation: state the task, exact paths, constraints, and the expected return.`;
+- Antes de editar, quebre a tarefa em frentes independentes (arquivos ou camadas
+  que não se sobrepõem) e dispare um subagente por frente. Todas as chamadas do
+  Agent tool na MESMA mensagem, para rodarem em paralelo.
+- Frentes que tocam o mesmo arquivo não vão em paralelo: serialize, ou faça você.
+- Cada subagente recebe: objetivo, arquivos que pode tocar, invariantes do
+  CLAUDE.md que valem ali e o critério de pronto (qual teste em 'tests/',
+  'pnpm test', 'pnpm dev:infra' ou 'pnpm typecheck' prova a mudança).
+- Use 'model: "sonnet"' nas chamadas do Agent tool. Só suba de modelo quando a
+  frente exigir decisão arquitetural, não implementação.
+- Escolha o subagente pela 'description' do frontmatter dele, não por memória:
+  '.claude/agents/' tem vinte agentes e a lista chega inteira à sessão. Os três
+  que resolvem a maior parte das frentes deste repo: 'guard-reviewer' (isolamento
+  entre organizações, prompt injection, vazamento de credencial — o único que
+  conhece as invariantes daqui), 'Explore' para localizar código e
+  'general-purpose' para implementar.
+- A sessão principal não implementa em paralelo com os subagentes: ela revisa o
+  que voltou, integra, roda typecheck/testes e responde.
+- Tarefa trivial (um arquivo, edição óbvia, pergunta direta): faça você mesmo,
+  delegar custaria mais que fazer.`;
 
 /** @type {any} */
 let event;

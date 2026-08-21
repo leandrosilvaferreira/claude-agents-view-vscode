@@ -19,3 +19,5 @@
 - [Import-graph lint rules fail silent](architecture-import-graph-lint-rules-fail-silent.md) — `import-x/no-cycle` needs `import-x/extensions`+`parsers`; import-x v4 needs `resolver-next`; boundaries needs `checkAllOrigins`.
 
 - [Worktree auto custom-title collides dedupe key](architecture-worktree-custom-title-collision.md) — Claude Code auto-stamps custom-title=worktree name (/→+); mistaken for a rename, collapses `getDedupeKey()`, drops sessions silently.
+
+- [Tolerant parser pattern, convergent prior art](architecture-tolerant-parser-pattern.md) — 4 independent parsers of this format converge on per-line isolation + unknown-bucket; Tolerant Reader/ACL/Golden-Master naming + gaps.
