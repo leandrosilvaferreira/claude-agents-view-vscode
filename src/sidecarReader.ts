@@ -11,6 +11,14 @@ import { logDebug } from './logger';
  */
 export interface SidecarMetadata {
   agentType?: string;
+  name?: string; // A subagent's CUSTOM display name, set at launch (e.g. Agent tool input
+  // `name: "F3-vitest"`, or a forked-skill teammate's own `name`). A level-1 subagent already
+  // gets this correctly from its launching tool_use block (subagentDetector.ts) and never needs
+  // this field. It exists here purely for nestedSubagents.ts's grandchildren, which have NO
+  // tool_use block at all — without it, a named parallel fan-out of grandchildren all render
+  // under the same generic `agentType` label, indistinguishable from each other (real corpus:
+  // 34/34 sampled grandchildren with `name` set had `name !== agentType`, e.g.
+  // `angle-a-linebyline` vs. the real specialist `code-reviewer`).
   model?: string;
   toolUseId?: string;
   agentId?: string;
@@ -34,9 +42,11 @@ export interface SidecarMetadata {
  * (no run-length collapsing — "/.claude/" produces "--claude-", a real double-dash on disk).
  * Encoding is unambiguous (unlike decoding, which is a best-effort guess), so a plain regex
  * replace is all that's needed here — nothing to reuse from decodeClaudeProjectPath's
- * filesystem-probing disambiguation, which solves the opposite, ambiguous direction.
+ * filesystem-probing disambiguation, which solves the opposite, ambiguous direction. Exported so
+ * projectPathResolver.ts can compute the same encoded form to append onto Session.knownProjectDirs
+ * as it goes — this module and that one otherwise share no dependency in either direction.
  */
-function encodeProjectDir(projectPath: string): string {
+export function encodeProjectDir(projectPath: string): string {
   return projectPath.replace(/[^A-Za-z0-9]/g, '-');
 }
 
@@ -45,10 +55,20 @@ function encodeProjectDir(projectPath: string): string {
  * ~/.claude/projects/<encoded-base> directory, while its subagent sidecars land under the
  * WORKTREE's own encoded directory (subagents run with the worktree as their real cwd, unlike
  * the parent transcript's fixed location). So sidecars must be looked up in BOTH: the directory
- * the main transcript itself lives in (from session.logFilePath), and the directory
- * session.projectPath currently encodes to (the last cwd seen on this transcript, which may be
- * the worktree, or may be the base — it can flip over a session's lifetime). Never assume either
- * alone is enough. Order matters for readAllSidecars' "later dir wins" dedup.
+ * the main transcript itself lives in (from session.logFilePath), and EVERY directory
+ * session.projectPath has ever encoded to over the session's life (session.knownProjectDirs) —
+ * not just the current one. `projectPath` alone only ever reflects the LATEST cwd seen, and a
+ * session that enters a worktree, dispatches subagents there, then leaves it again has
+ * `projectPath` revert to the base cwd — silently and permanently losing the worktree directory
+ * from this search the moment that happens, even though the sidecars are still sitting right
+ * there on disk (real corpus, 14-day audit 2026-08-21: 27 of 34 worktree-split sessions ended
+ * exactly this way). `knownProjectDirs` is appended to (deduped) in projectPathResolver.ts
+ * wherever `projectPath` is set, precisely so this function can still find it here. Falls back to
+ * encoding `projectPath` directly when `knownProjectDirs` is empty/unset (e.g. a Session built
+ * directly in a test without going through ProjectPathResolver), preserving the old single-dir
+ * behavior for that case. Order matters: base dir first, then historical dirs oldest-to-newest,
+ * so readAllSidecars' "later dir wins" dedup still prefers the most-recently-active directory —
+ * exactly as it did back when there was only ever one historical dir to consider.
  */
 export function candidateMetadataDirs(session: Session): string[] {
   const baseDir = path.dirname(session.logFilePath);
@@ -56,8 +76,10 @@ export function candidateMetadataDirs(session: Session): string[] {
     return [baseDir];
   }
   const claudeProjectsPath = path.dirname(baseDir);
-  const projectPathDir = path.join(claudeProjectsPath, encodeProjectDir(session.projectPath));
-  return projectPathDir === baseDir ? [baseDir] : [baseDir, projectPathDir];
+  const encodedDirs = session.knownProjectDirs?.length
+    ? session.knownProjectDirs
+    : [encodeProjectDir(session.projectPath)];
+  return [...new Set([baseDir, ...encodedDirs.map((dir) => path.join(claudeProjectsPath, dir))])];
 }
 
 /** Reads every sidecar under `<dir>/<sessionId>/subagents/` across all candidate dirs, in dir
@@ -157,6 +179,7 @@ function readSidecarFile(filePath: string): SidecarMetadata | null {
     const fields = parsed as Record<string, unknown>;
     return {
       agentType: typeof fields.agentType === 'string' ? fields.agentType : undefined,
+      name: typeof fields.name === 'string' ? fields.name : undefined,
       model: typeof fields.model === 'string' ? fields.model : undefined,
       toolUseId: typeof fields.toolUseId === 'string' ? fields.toolUseId : undefined,
       agentId: extractAgentIdFromFilename(path.basename(filePath)),

@@ -167,6 +167,52 @@ describe('refreshNestedSubagents', () => {
     expect(parentA.children?.[0].children).toBeUndefined();
   });
 
+  it("prefers the sidecar's own name over agentType for a grandchild (named parallel fan-out)", () => {
+    // Real corpus: 34/34 sampled grandchildren with `name` set had name !== agentType — e.g.
+    // `angle-a-linebyline` (name) vs. `code-reviewer` (the real specialist agentType). Without
+    // preferring `name`, every member of a named fan-out renders under the same generic
+    // agentType label, indistinguishable from its siblings.
+    writeSidecar(baseDirName, 'named-child', {
+      agentType: 'code-reviewer',
+      name: 'angle-a-linebyline',
+      parentAgentId: 'parent-agent-14',
+    });
+    writeChildTranscript(baseDirName, 'named-child', 1000);
+    const parent = makeSubagent({ id: 'toolu_p14', agentId: 'parent-agent-14' });
+    const session = makeSession({ subagents: [parent] });
+
+    refreshNestedSubagents(session);
+
+    expect(parent.children).toHaveLength(1);
+    expect(parent.children?.[0].name).toBe('angle-a-linebyline');
+  });
+
+  describe('worktree history (knownProjectDirs)', () => {
+    it('still attaches a grandchild whose sidecar lives in a worktree directory the session has since left', () => {
+      // Real corpus (14-day audit, 2026-08-21): 27 of 34 worktree-split sessions enter a
+      // worktree, dispatch subagents there, then leave it — projectPath reverts to the base cwd,
+      // and without knownProjectDirs remembering the worktree's encoded dir, this grandchild's
+      // sidecar is lost forever even though it still exists on disk.
+      writeSidecar(worktreeDirName, 'child-left-worktree', {
+        agentType: 'angle-a-linebyline',
+        parentAgentId: 'parent-agent-13',
+      });
+      writeChildTranscript(worktreeDirName, 'child-left-worktree', 1000);
+      const parent = makeSubagent({ id: 'toolu_p13', agentId: 'parent-agent-13' });
+      const session = makeSession({
+        subagents: [parent],
+        logFilePath: path.join(claudeProjectsDir, baseDirName, `${sessionId}.jsonl`),
+        projectPath: '/Users/dev/Projetos/demo', // back at base — worktree only survives in knownProjectDirs now
+        knownProjectDirs: [worktreeDirName, baseDirName],
+      });
+
+      refreshNestedSubagents(session);
+
+      expect(parent.children).toHaveLength(1);
+      expect(parent.children?.[0].name).toBe('angle-a-linebyline');
+    });
+  });
+
   it('drops non-string sidecar fields on a grandchild instead of rendering them as [object Object]', () => {
     writeSidecar(baseDirName, 'weirdchild', {
       agentType: { nested: 'oops' },

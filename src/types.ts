@@ -16,6 +16,17 @@ export interface Session {
   id: string; // The session UUID or Conversation ID
   projectHash: string; // Raw project-hash directory name or ID
   projectPath: string; // Resolved project absolute path
+  // Every ~/.claude/projects encoded directory name (sidecarReader.ts's encodeProjectDir)
+  // `projectPath` has ever resolved to over this session's life, oldest first, deduped.
+  // `projectPath` alone only reflects the LATEST cwd seen — a session that enters a git
+  // worktree, dispatches subagents there (their sidecars land ONLY under the worktree's own
+  // encoded directory), then leaves the worktree has `projectPath` revert to the base cwd,
+  // which would otherwise silently and permanently drop the worktree directory from
+  // sidecarReader.ts's candidateMetadataDirs search (real corpus, 14-day audit 2026-08-21: 27
+  // of 34 worktree-split sessions ended exactly this way). Appended to in
+  // projectPathResolver.ts wherever `projectPath` is set — never assign `projectPath` directly
+  // from a new call site without also going through that same helper.
+  knownProjectDirs?: string[];
   projectName: string; // Human-readable project folder name or user prompt
   gitBranch: string;
   status: 'working' | 'stopped';

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LogEntry } from './transcriptEntry';
 import { Session } from './types';
+import { encodeProjectDir } from './sidecarReader';
 
 /**
  * Works out the repo context a transcript belongs to: which project, which git branch, and
@@ -29,12 +30,12 @@ export class ProjectPathResolver {
     if (json.type === 'USER_INPUT' && typeof json.content === 'string') {
       const activeDocMatch = json.content.match(/Active Document:\s*([^\n]+)/);
       if (activeDocMatch) {
-        session.projectPath = this.findProjectRoot(activeDocMatch[1].trim());
+        this.setProjectPath(session, this.findProjectRoot(activeDocMatch[1].trim()));
         return;
       }
       const otherDocMatch = json.content.match(/Other open documents:\s*-\s*([^\n]+)/);
       if (otherDocMatch) {
-        session.projectPath = this.findProjectRoot(otherDocMatch[1].trim());
+        this.setProjectPath(session, this.findProjectRoot(otherDocMatch[1].trim()));
         return;
       }
     }
@@ -42,13 +43,13 @@ export class ProjectPathResolver {
     // 2. Extract from Cwd
     const cwd = this.extractCwd(json);
     if (cwd) {
-      session.projectPath = cwd;
+      this.setProjectPath(session, cwd);
       return;
     }
 
     // 3. Extract from TargetFile
     if (json.TargetFile) {
-      session.projectPath = this.findProjectRoot(json.TargetFile);
+      this.setProjectPath(session, this.findProjectRoot(json.TargetFile));
     }
   }
 
@@ -122,13 +123,38 @@ export class ProjectPathResolver {
     return currentPath;
   }
 
+  /**
+   * The single place `projectPath` is ever assigned, across all five call sites in this class
+   * (Claude Code's own `cwd` field, and the four Antigravity fallbacks in `detectProjectPath`).
+   * Also appends the newly-seen path's encoded sidecar directory to `session.knownProjectDirs`,
+   * deduped — see that field's own doc comment in types.ts for why: `projectPath` alone only ever
+   * reflects the LATEST cwd seen on this transcript, so a session that enters a git worktree,
+   * dispatches subagents there (their sidecars land ONLY under the worktree's own encoded
+   * directory — see sidecarReader.ts's candidateMetadataDirs), then leaves the worktree again
+   * would otherwise silently and permanently drop that directory from every future sidecar lookup
+   * the moment `projectPath` reverts to the base cwd. Real corpus (14-day audit, 2026-08-21): 27
+   * of 34 worktree-split sessions ended exactly this way. A raw `session.projectPath = x`
+   * assignment at any call site would reopen that bug for it.
+   */
+  private setProjectPath(session: Session, projectPath: string): void {
+    session.projectPath = projectPath;
+    const encodedDir = encodeProjectDir(projectPath);
+    if (session.knownProjectDirs) {
+      if (!session.knownProjectDirs.includes(encodedDir)) {
+        session.knownProjectDirs.push(encodedDir);
+      }
+    } else {
+      session.knownProjectDirs = [encodedDir];
+    }
+  }
+
   private detectClaudeCodeProjectPath(json: LogEntry, session: Session): void {
     // The project-directory name Claude Code encodes to (e.g. `-Users-me-aia_harness` for
     // `/Users/me/aia_harness`) is ambiguous to decode: every non-alphanumeric character,
     // including `_` and `.`, collapses to the same `-` as the path separator. The transcript's
     // own `cwd` field carries the real, unambiguous path — always prefer it over the guess.
     if (typeof json.cwd === 'string' && json.cwd.trim()) {
-      session.projectPath = json.cwd.trim();
+      this.setProjectPath(session, json.cwd.trim());
       session.projectName = path.basename(session.projectPath) || session.projectName;
     }
   }

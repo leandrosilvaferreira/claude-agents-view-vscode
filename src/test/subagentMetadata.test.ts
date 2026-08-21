@@ -127,6 +127,31 @@ describe('enrichSubagentMetadata', () => {
     expect(sub.model).toBe('sonnet');
   });
 
+  it('still finds a sidecar written in the worktree directory after the session leaves the worktree (regression: knownProjectDirs)', () => {
+    // Real corpus (14-day audit, 2026-08-21): 27 of 34 worktree-split sessions ended exactly
+    // like this — the session enters a worktree, dispatches a subagent there (its sidecar lands
+    // ONLY under the worktree's encoded dir), then leaves, and projectPath reverts to the base
+    // cwd. Without knownProjectDirs remembering the worktree's encoded dir too, this sidecar is
+    // lost forever even though it still physically exists on disk.
+    writeSidecar(worktreeDirName, 'a1', {
+      agentType: 'backend-specialist',
+      toolUseId: 'toolu_worktree_then_left',
+      model: 'sonnet',
+    });
+    const sub = makeSubagent({ id: 'toolu_worktree_then_left' });
+    const session = makeSession({
+      subagents: [sub],
+      logFilePath: path.join(claudeProjectsDir, baseDirName, `${sessionId}.jsonl`),
+      projectPath: '/Users/dev/Projetos/demo', // reverted back to base — worktree only survives in knownProjectDirs now
+      knownProjectDirs: [worktreeDirName, baseDirName],
+    });
+
+    enrichSubagentMetadata(session);
+
+    expect(sub.name).toBe('backend-specialist');
+    expect(sub.model).toBe('sonnet');
+  });
+
   it('is deterministic when the same toolUseId exists in both candidate directories', () => {
     writeSidecar(baseDirName, 'a1', { agentType: 'from-base', toolUseId: 'toolu_dup', model: 'opus' });
     writeSidecar(worktreeDirName, 'a2', { agentType: 'from-worktree', toolUseId: 'toolu_dup', model: 'haiku' });

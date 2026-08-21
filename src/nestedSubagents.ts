@@ -85,14 +85,19 @@ function groupByParentAgentId(sidecars: SidecarMetadata[]): Map<string, SidecarM
 /** Builds a grandchild SubAgent straight from its sidecar — unlike a level-1 subagent, there is
  * no tool_use block to detect it from (its launch happened inside the PARENT's own transcript,
  * which this extension deliberately never reads), so every field comes from the sidecar alone.
- * Status is computed HERE, at build time, never cached — see computeChildStatus. Falls back to a
- * random id in the (essentially never hit) case where the filename didn't match the expected
- * agent-<id>.meta.json shape. */
+ * `name` prefers the sidecar's own custom `name` over the generic `agentType`, mirroring how a
+ * level-1 subagent already prefers its launch tool_use's own `name` input over agentType — without
+ * this, every member of a named parallel fan-out of grandchildren renders under the same generic
+ * `agentType` label, indistinguishable from its siblings (real corpus: 34/34 sampled grandchildren
+ * with `name` set had `name !== agentType`, e.g. `angle-a-linebyline` vs. the real specialist
+ * `code-reviewer`). Status is computed HERE, at build time, never cached — see computeChildStatus.
+ * Falls back to a random id in the (essentially never hit) case where the filename didn't match
+ * the expected agent-<id>.meta.json shape. */
 function toChildSubAgent(meta: SidecarMetadata): SubAgent {
   return {
     id: meta.agentId ?? meta.toolUseId ?? Math.random().toString(),
     agentId: meta.agentId,
-    name: meta.agentType ?? 'Agent',
+    name: meta.name ?? meta.agentType ?? 'Agent',
     task: meta.description ?? 'Delegate task',
     status: computeChildStatus(meta),
     model: meta.model,

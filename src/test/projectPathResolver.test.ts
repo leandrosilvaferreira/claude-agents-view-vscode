@@ -51,3 +51,31 @@ describe('ProjectPathResolver.detectProjectPath', () => {
     expect(session.projectPath).toBe(path.dirname(filePath));
   }, 2000); // explicit timeout: a reintroduced infinite loop must fail fast, not hang CI
 });
+
+describe('ProjectPathResolver.knownProjectDirs (worktree history)', () => {
+  // Regression coverage for the bug this field exists to fix: a session that enters a git
+  // worktree, dispatches subagents there, then leaves it again has `projectPath` revert to the
+  // base cwd — sidecarReader.ts's candidateMetadataDirs needs every historical encoded dir, not
+  // just the latest, to still find those subagents' sidecars (see that field's doc comment in
+  // types.ts).
+  it('accumulates a distinct encoded dir for each distinct cwd seen, deduping repeats and re-visits', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectProjectPath({ cwd: '/Users/dev/demo' }, session);
+    resolver.detectProjectPath({ cwd: '/Users/dev/demo/.claude/worktrees/fix-thing' }, session);
+    resolver.detectProjectPath({ cwd: '/Users/dev/demo' }, session); // left the worktree, back to base
+    resolver.detectProjectPath({ cwd: '/Users/dev/demo/.claude/worktrees/fix-thing' }, session); // re-entered it
+
+    expect(session.knownProjectDirs).toEqual(['-Users-dev-demo', '-Users-dev-demo--claude-worktrees-fix-thing']);
+  });
+
+  it('never touches knownProjectDirs when the entry reveals no cwd', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectProjectPath({}, session);
+
+    expect(session.knownProjectDirs).toBeUndefined();
+  });
+});
