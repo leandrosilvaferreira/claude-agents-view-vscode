@@ -1,6 +1,6 @@
 {
   "path": ["src"],
-  "ignore": ["src/test/**"],
+  "ignore": ["src/test/**", "src/generated/**"],
   "format": ["typescript"],
   "minLines": 8,
   "minTokens": 60,

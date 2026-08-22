@@ -35,7 +35,17 @@ export default defineConfig(
       // can't parse them and they follow their own conventions.
       '.claude/**',
       '.agents/**',
-      'scripts/**',
+      // Only this one file — not the whole scripts/** dir, so scripts/schema-gen/**
+      // (its own scripts/tsconfig.json project) gets linted like everything else.
+      'scripts/install-plugins.mjs',
+      // Generated reference (npm run schema:generate), not hand-written source: keeping
+      // it out of ESLint's typed-project pass stops its size (~8000 lines, driven by
+      // corpus breadth) from joining `parserOptions.projectService`'s program graph, which
+      // otherwise slows typed linting enough to time out unrelated tests (see
+      // .claude/memory/architecture-generated-file-breaks-eslint-projectservice.md). Root
+      // tsconfig.json still includes it under src/**/* on purpose — `tsc --noEmit` keeps
+      // type-checking it, only ESLint skips it.
+      'src/generated/**',
     ],
   },
   eslint.configs.recommended,

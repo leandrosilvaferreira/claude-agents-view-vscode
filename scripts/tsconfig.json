@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "target": "ES2022",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    // Pin automatic @types inclusion to just "node". Without this, TS auto-includes every
+    // package under node_modules/@types, and vitest 4's transitive @types/chai (which ships
+    // "type": "module") breaks NodeNext's automatic global inclusion for @types/node — fs/path/
+    // os/process/Buffer/etc. silently stop resolving project-wide. See root tsconfig.json and
+    // .claude/memory/architecture-types-node-pin-under-nodenext.md for the full detail.
+    "types": ["node"],
+    "noEmit": true,
+    // rootDir/include are resolved relative to *this file's* own directory (scripts/), not the
+    // invocation cwd — so "." / "**/*.ts" here is the equivalent of the plan's "scripts" /
+    // "scripts/**/*.ts", written from repo root where this tsconfig.json itself now lives.
+    "rootDir": "."
+  },
+  "include": ["**/*.ts"]
+}

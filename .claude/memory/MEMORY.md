@@ -20,4 +20,10 @@
 
 - [Worktree auto custom-title collides dedupe key](architecture-worktree-custom-title-collision.md) — Claude Code auto-stamps custom-title=worktree name (/→+); mistaken for a rename, collapses `getDedupeKey()`, drops sessions silently.
 
+- [jscpd trips on generated schema file](architecture-jscpd-duplicate-in-generated-shapes.md) — `npm run lint`'s jscpd stage (separate from ESLint, own `.jscpd.json`) still fails on `src/generated/transcriptShapes.ts` after the ESLint ignore fix.
+
 - [Tolerant parser pattern, convergent prior art](architecture-tolerant-parser-pattern.md) — 4 independent parsers of this format converge on per-line isolation + unknown-bucket; Tolerant Reader/ACL/Golden-Master naming + gaps.
+
+- [scripts/package.json type:module breaks tsc NodeNext](architecture-scripts-package-json-breaks-tsc-nodenext.md) — flips scripts/ to ESM-ambient, forcing TS2835 on every extensionless import; unneeded once tsx is the runner.
+
+- [Large generated file breaks lintRules.test.ts](architecture-generated-file-breaks-eslint-projectservice.md) — transcriptShapes.ts (~8000 lines) slows ESLint's parserOptions.projectService enough to time out an unrelated test; check before committing T12's real baseline.

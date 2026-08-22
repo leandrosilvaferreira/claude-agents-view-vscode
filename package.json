@@ -134,7 +134,9 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "compile:scripts": "tsc -p scripts/tsconfig.json --noEmit",
+    "schema:generate": "tsx scripts/schema-gen/generate.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -151,8 +153,10 @@
     "eslint-plugin-sonarjs": "^4.2.0",
     "jscpd": "^5.0.14",
     "prettier": "^3.2.5",
+    "tsx": "^4.23.12",
     "typescript": "^5.0.4",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "zod": "^4.4.3"
   }
 }

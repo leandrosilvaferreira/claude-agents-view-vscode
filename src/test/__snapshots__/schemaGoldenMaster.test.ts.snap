@@ -1,0 +1,532 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Schema golden master (schema-corpus fixtures) > agent-name: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "agent-name",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "agent-name.jsonl",
+  "projectName": "agent-name.jsonl",
+  "projectPath": "agent-name.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > agent-name: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > ai-title: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "ai-title",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": true,
+  "projectHash": "ai-title.jsonl",
+  "projectName": "ai-title.jsonl",
+  "projectPath": "ai-title.jsonl",
+  "sessionTitle": "Sample text 1",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > ai-title: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > artifact-autoreact-ledger: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "artifact-autoreact-ledger",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "artifact-autoreact-ledger.jsonl",
+  "projectName": "artifact-autoreact-ledger.jsonl",
+  "projectPath": "artifact-autoreact-ledger.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > artifact-autoreact-ledger: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > artifact-comment-monitor: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "artifact-comment-monitor",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "artifact-comment-monitor.jsonl",
+  "projectName": "artifact-comment-monitor.jsonl",
+  "projectPath": "artifact-comment-monitor.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > artifact-comment-monitor: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > assistant: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 21",
+  "entrypoint": "Sample text 18",
+  "gitBranch": "Sample text 22",
+  "id": "assistant",
+  "knownProjectDirs": [
+    "Sample-text-16",
+    "Sample-text-19",
+  ],
+  "lastEntryIsInterruption": false,
+  "lastEntryIsThinking": false,
+  "lastEntryType": "assistant",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "model": "Sample text 2",
+  "nameFromPrompt": false,
+  "projectHash": "assistant.jsonl",
+  "projectName": "Sample text 19",
+  "projectPath": "Sample text 19",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > assistant: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > atis-latch: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "atis-latch",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "atis-latch.jsonl",
+  "projectName": "atis-latch.jsonl",
+  "projectPath": "atis-latch.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > atis-latch: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > attachment: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 14",
+  "entrypoint": "Sample text 11",
+  "gitBranch": "Sample text 15",
+  "id": "attachment",
+  "knownProjectDirs": [
+    "Sample-text-10",
+    "Sample-text-12",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "attachment.jsonl",
+  "projectName": "Sample text 12",
+  "projectPath": "Sample text 12",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > attachment: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > bridge-session: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "bridge-session",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "bridge-session.jsonl",
+  "projectName": "bridge-session.jsonl",
+  "projectPath": "bridge-session.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > bridge-session: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > custom-title: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "custom-title",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": true,
+  "projectHash": "custom-title.jsonl",
+  "projectName": "custom-title.jsonl",
+  "projectPath": "custom-title.jsonl",
+  "sessionTitle": "Sample text 1",
+  "status": "stopped",
+  "subagents": [],
+  "titleIsCustom": true,
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > custom-title: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > file-history-delta: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "file-history-delta",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "file-history-delta.jsonl",
+  "projectName": "file-history-delta.jsonl",
+  "projectPath": "file-history-delta.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > file-history-delta: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > file-history-snapshot: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "file-history-snapshot",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "file-history-snapshot.jsonl",
+  "projectName": "file-history-snapshot.jsonl",
+  "projectPath": "file-history-snapshot.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > file-history-snapshot: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > frame-link: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "frame-link",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "frame-link.jsonl",
+  "projectName": "frame-link.jsonl",
+  "projectPath": "frame-link.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > frame-link: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > last-prompt: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "last-prompt",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "last-prompt.jsonl",
+  "projectName": "last-prompt.jsonl",
+  "projectPath": "last-prompt.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > last-prompt: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > mode: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "mode",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "mode.jsonl",
+  "projectName": "mode.jsonl",
+  "projectPath": "mode.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > mode: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > permission-mode: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "permission-mode",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "permission-mode.jsonl",
+  "projectName": "permission-mode.jsonl",
+  "projectPath": "permission-mode.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > permission-mode: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > pr-link: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "pr-link",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "pr-link.jsonl",
+  "projectName": "pr-link.jsonl",
+  "projectPath": "pr-link.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > pr-link: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > queue-operation: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "queue-operation",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "queue-operation.jsonl",
+  "projectName": "queue-operation.jsonl",
+  "projectPath": "queue-operation.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > queue-operation: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > relocated: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "relocated",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "relocated.jsonl",
+  "projectName": "relocated.jsonl",
+  "projectPath": "relocated.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > relocated: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-api_error: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 15",
+  "entrypoint": "Sample text 12",
+  "gitBranch": "Sample text 16",
+  "id": "system-api_error",
+  "knownProjectDirs": [
+    "Sample-text-13",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "system-api_error.jsonl",
+  "projectName": "Sample text 13",
+  "projectPath": "Sample text 13",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-api_error: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-compact_boundary: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 79",
+  "entrypoint": "Sample text 76",
+  "gitBranch": "Sample text 80",
+  "id": "system-compact_boundary",
+  "isSidechain": true,
+  "knownProjectDirs": [
+    "Sample-text-21",
+    "Sample-text-726",
+    "Sample-text-77",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "system-compact_boundary.jsonl",
+  "projectName": "Sample text 77",
+  "projectPath": "Sample text 77",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-compact_boundary: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-informational: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 11",
+  "entrypoint": "Sample text 8",
+  "gitBranch": "Sample text 12",
+  "id": "system-informational",
+  "knownProjectDirs": [
+    "Sample-text-9",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "system-informational.jsonl",
+  "projectName": "Sample text 9",
+  "projectPath": "Sample text 9",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-informational: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-local_command: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 11",
+  "entrypoint": "Sample text 8",
+  "gitBranch": "Sample text 12",
+  "id": "system-local_command",
+  "knownProjectDirs": [
+    "Sample-text-9",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "system-local_command.jsonl",
+  "projectName": "Sample text 9",
+  "projectPath": "Sample text 9",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-local_command: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-stop_hook_summary: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 17",
+  "entrypoint": "Sample text 14",
+  "gitBranch": "Sample text 18",
+  "id": "system-stop_hook_summary",
+  "knownProjectDirs": [
+    "Sample-text-15",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "system-stop_hook_summary.jsonl",
+  "projectName": "Sample text 15",
+  "projectPath": "Sample text 15",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-stop_hook_summary: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-turn_duration: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 9",
+  "entrypoint": "Sample text 6",
+  "gitBranch": "Sample text 10",
+  "id": "system-turn_duration",
+  "knownProjectDirs": [
+    "Sample-text-7",
+  ],
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "system-turn_duration.jsonl",
+  "projectName": "Sample text 7",
+  "projectPath": "Sample text 7",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > system-turn_duration: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > user: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 13",
+  "entrypoint": "Sample text 10",
+  "gitBranch": "Sample text 14",
+  "id": "user",
+  "knownProjectDirs": [
+    "Sample-text-8",
+    "Sample-text-11",
+  ],
+  "lastEntryIsInterruption": false,
+  "lastEntryIsThinking": false,
+  "lastEntryType": "user",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": true,
+  "projectHash": "user.jsonl",
+  "projectName": "Sample text 11",
+  "projectPath": "Sample text 11",
+  "sessionTitle": "Sample text 3",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > user: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > worktree-state: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "worktree-state",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "worktree-state.jsonl",
+  "projectName": "worktree-state.jsonl",
+  "projectPath": "worktree-state.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+  "worktreeName": "Sample text 4",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > worktree-state: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
