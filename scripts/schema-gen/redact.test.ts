@@ -67,4 +67,24 @@ describe('redact', () => {
     expect(result.tool_calls?.[0]?.arguments?.Cwd).toMatch(PLACEHOLDER);
     expect(result.tool_calls?.[0]?.arguments?.SearchPath).toMatch(PLACEHOLDER);
   });
+
+  it('redacts a content-derived object key (e.g. AskUserQuestion answers) instead of leaking the question text into the output', () => {
+    const question = 'Is this a real question with spaces and a question mark?';
+    const line = {
+      type: 'tool_result',
+      toolUseResult: { status: 'success' as const, answers: { [question]: 'yes' } },
+    };
+
+    const result = redact(line);
+    const serialized = JSON.stringify(result);
+
+    // The allowlisted, schema-like sibling key is completely unaffected.
+    expect(result.type).toBe('tool_result');
+    expect(result.toolUseResult.status).toBe('success');
+    // Neither the question text nor the answer value survives anywhere in the output.
+    expect(serialized).not.toContain(question);
+    expect(serialized).not.toContain('"yes"');
+    // The unsafe key itself is redacted too, using its own counter.
+    expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+  });
 });

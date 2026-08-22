@@ -1,4 +1,5 @@
 import { ParseError, WalkResult } from './corpusWalker';
+import { isSchemaLikeKey } from './keySafety';
 import {
   createEmptyModel,
   mergeSchemaObservations,
@@ -23,15 +24,22 @@ import {
  * itself; `Array.isArray`/`isPlainObject` below only decide *recursion* strategy, never what
  * string gets recorded.
  *
- * Two structural safeguards keep one pathological line (e.g. a huge `tool_use` payload) from
+ * Three structural safeguards keep one pathological line (e.g. a huge `tool_use` payload) from
  * blowing up the field-path space (transcript-schema-gen.md, "Data Shapes"): recursion stops
- * at MAX_FIELD_DEPTH, and every array's contents collapse onto one trailing `[]` path segment
- * instead of exploding into per-index paths.
+ * at MAX_FIELD_DEPTH, every array's contents collapse onto one trailing `[]` path segment
+ * instead of exploding into per-index paths, and an object key that isn't a plain identifier
+ * (see keySafety.ts — e.g. `toolUseResult.answers`, keyed by literal AskUserQuestion question
+ * text) collapses onto one trailing `[dynamic-key]` segment instead of leaking its literal text
+ * into the path; recursion also stops there, since nothing under an unsafe key can be assumed to
+ * be normal structure.
  */
 
 /** Top-level fields are depth 1; nesting stops recording once a path reaches this depth. */
 const MAX_FIELD_DEPTH = 5;
 const ARRAY_PATH_SEGMENT = '[]';
+/** Placeholder for an object key that fails isSchemaLikeKey — mirrors the ARRAY_PATH_SEGMENT
+ * convention above, but for a content-derived key instead of an array index. */
+const DYNAMIC_KEY_SEGMENT = '[dynamic-key]';
 /** Bucket key for a line whose `type` isn't a usable non-empty string — parenthesized so it
  * can never collide with a real `type` value (those look like plain identifiers). */
 const UNKNOWN_TYPE_KEY = '(no type)';
@@ -111,6 +119,15 @@ function walkValue(value: unknown, ctx: WalkContext): Record<string, FieldObserv
   }
   if (isPlainObject(value)) {
     for (const [key, nested] of Object.entries(value)) {
+      if (!isSchemaLikeKey(key)) {
+        // Key itself is content-derived (e.g. AskUserQuestion's `answers`, keyed by the literal
+        // question text) — collapse it onto a fixed placeholder and record only that a field was
+        // present, without recursing into whatever's underneath it.
+        fields = mergeFieldMaps(fields, {
+          [`${ctx.path}.${DYNAMIC_KEY_SEGMENT}`]: newFieldObservation(nested, ctx.version),
+        });
+        continue;
+      }
       fields = mergeFieldMaps(
         fields,
         walkValue(nested, { path: `${ctx.path}.${key}`, depth: ctx.depth + 1, version: ctx.version }),
@@ -124,6 +141,10 @@ function walkValue(value: unknown, ctx: WalkContext): Record<string, FieldObserv
 function collectFields(value: Record<string, unknown>, version: string): Record<string, FieldObservation> {
   let fields: Record<string, FieldObservation> = {};
   for (const [key, fieldValue] of Object.entries(value)) {
+    if (!isSchemaLikeKey(key)) {
+      fields = mergeFieldMaps(fields, { [DYNAMIC_KEY_SEGMENT]: newFieldObservation(fieldValue, version) });
+      continue;
+    }
     fields = mergeFieldMaps(fields, walkValue(fieldValue, { path: key, depth: 1, version }));
   }
   return fields;

@@ -115,4 +115,40 @@ describe('aggregateSchema', () => {
     expect(parseErrors).toEqual([badLine]);
     expect(model.types.user.sampleCount).toBe(1);
   });
+
+  it('collapses a content-derived object key (e.g. AskUserQuestion answers) onto [dynamic-key] instead of leaking it into the path', async () => {
+    const question = 'Is this a real question with spaces and a question mark?';
+    const line = parsedLine({
+      type: 'user',
+      toolUseResult: { answers: { [question]: 'yes' } },
+    });
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.user.fields);
+    expect(paths).toContain('toolUseResult.answers.[dynamic-key]');
+    expect(paths.some((path) => path.includes(question))).toBe(false);
+    expect(paths.some((path) => path.includes('?'))).toBe(false);
+    expect(paths.some((path) => path.includes(' '))).toBe(false);
+  });
+
+  it('leaves ordinary schema-like field paths exactly as before this fix', async () => {
+    const line = parsedLine({
+      type: 'user',
+      message: { role: 'user', content: { text: 'hello there' } },
+    });
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const fields = model.types.user.fields;
+    expect(Object.keys(fields).sort()).toEqual(
+      ['type', 'message', 'message.role', 'message.content', 'message.content.text'].sort(),
+    );
+    expect(fields['message.content.text']).toEqual({
+      types: ['string'],
+      presentCount: 1,
+      firstSeenVersion: '',
+      lastSeenVersion: '',
+    });
+  });
 });
