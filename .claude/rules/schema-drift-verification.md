@@ -43,6 +43,16 @@ JSONL format — a deliberate Tolerant Reader (see
    `transcript-schema-gen.md`'s Non-Goals section in the repo root); don't re-litigate
    it.
 
+5. **If `npm run schema:generate` found no _structural_ drift, bump the version pin.**
+   "No structural drift" means the regenerated `src/generated/transcriptShapes.ts` differs
+   from the committed one only in its `// present in N/M samples` sample-count comments —
+   diff the file with those comments stripped and confirm no line differs, i.e. no field
+   path was added or removed and no type changed. Only then update
+   `KNOWN_COMPATIBLE_CLAUDE_VERSION` in `src/claudeCompat.ts` to the new Claude Code CLI
+   version. If the diff shows real structural drift instead, do NOT bump the pin — that is
+   exactly the case this procedure exists to catch, and it needs parser investigation
+   (steps 1-3 above) before the pin is touched.
+
 This procedure is a drift-detector and coverage-gap surfacer, not a schema validator.
 Never turn it into a runtime contract the parser is bound to — that was deliberately
 rejected (see `.claude/memory/architecture-tolerant-parser-pattern.md`).

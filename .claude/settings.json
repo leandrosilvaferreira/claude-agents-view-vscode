@@ -216,6 +216,12 @@
           {
             "type": "command",
             "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/claude-version-orient.mjs"],
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node",
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-session-ctx.mjs"],
             "timeout": 10
           },
