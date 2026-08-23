@@ -152,3 +152,53 @@ describe('aggregateSchema', () => {
     });
   });
 });
+
+// Sibling top-level describes (not nested in the one above) so their line count doesn't push
+// that describe past this repo's max-lines-per-function limit.
+describe('aggregateSchema — Object.prototype member names as keys (Finding A)', () => {
+  // Each of these looks like a plain identifier but is really an inherited Object.prototype
+  // member — used as an ordinary object key in an aggregated line, it must collapse onto
+  // [dynamic-key] like any other unsafe key, not crash the merge (`path in base` resolving
+  // to the inherited built-in) and not get recorded as a literal field path.
+  it.each([
+    'constructor',
+    'toString',
+    '__proto__',
+    'hasOwnProperty',
+    'valueOf',
+    'isPrototypeOf',
+    'toLocaleString',
+    'propertyIsEnumerable',
+  ])(
+    'collapses an Object.prototype member name (%j) used as a key instead of crashing the aggregator',
+    async (protoKey) => {
+      const line = parsedLine({ type: 'user', toolUseResult: { status: 'success', [protoKey]: 'x' } });
+
+      const { model } = await aggregateSchema(toResults([line, line]));
+
+      const paths = Object.keys(model.types.user.fields);
+      expect(paths).toContain('toolUseResult.[dynamic-key]');
+      expect(paths).not.toContain(`toolUseResult.${protoKey}`);
+      expect(model.types.user.sampleCount).toBe(2);
+    },
+  );
+});
+
+describe('aggregateSchema — known dynamic-key containers (Finding B)', () => {
+  // A bare, punctuation-free real value (e.g. the tracked filename `LICENSE`, observed for
+  // real in the committed src/generated/transcriptShapes.ts before this fix) passes
+  // isSchemaLikeKey on shape alone, but every child of a known dynamic-key-map container
+  // must collapse onto [dynamic-key] regardless of its own shape.
+  it.each(['answers', 'trackedFileBackups', 'artifacts', '_meta'])(
+    'collapses a bare, identifier-shaped child key under the known dynamic-key container %j onto [dynamic-key]',
+    async (containerKey) => {
+      const line = parsedLine({ type: 'user', [containerKey]: { LICENSE: 'real tracked content' } });
+
+      const { model } = await aggregateSchema(toResults([line]));
+
+      const paths = Object.keys(model.types.user.fields);
+      expect(paths).toContain(`${containerKey}.[dynamic-key]`);
+      expect(paths).not.toContain(`${containerKey}.LICENSE`);
+    },
+  );
+});

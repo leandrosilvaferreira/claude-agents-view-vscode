@@ -157,15 +157,23 @@ function mergeFields(
   base: Record<string, FieldObservation>,
   incoming: Record<string, FieldObservation>,
 ): Record<string, FieldObservation> {
-  const merged: Record<string, FieldObservation> = { ...base };
+  // Map, not a plain-object accumulator: `fieldPath` is a dotted field-path segment built
+  // from a transcript's own key text (schemaAggregator.ts), so it must never be trusted to
+  // avoid colliding with an inherited Object.prototype member name (`toString`,
+  // `constructor`, ...). A plain `{}` accumulator using `fieldPath in base` would misread
+  // that as "already present" via the prototype chain even when `fieldPath` was never
+  // actually recorded, then merge the *inherited built-in* as if it were a real
+  // FieldObservation. `Map.get` has no prototype chain to consult and genuinely types its
+  // return as `FieldObservation | undefined`, so the `undefined` check below is exact —
+  // defense in depth alongside keySafety.ts's own guard, per review, not a replacement for it.
+  const merged = new Map(Object.entries(base));
   for (const [fieldPath, field] of Object.entries(incoming)) {
-    // `fieldPath in base` (a real boolean), not a truthy-check on `base[fieldPath]`: a
-    // plain Record index type is always `FieldObservation` here (never `| undefined`),
-    // so TS/eslint would flag an `existing ? … : …` truthy-check on the indexed value
-    // itself as unnecessary even though the key genuinely may be absent at runtime.
-    merged[fieldPath] = fieldPath in base ? mergeFieldObservation(base[fieldPath], field) : field;
+    const existing = merged.get(fieldPath);
+    merged.set(fieldPath, existing === undefined ? field : mergeFieldObservation(existing, field));
   }
-  return merged;
+  // Object.fromEntries uses CreateDataPropertyOrThrow, not [[Set]] — a `__proto__` entry
+  // always lands as a genuine own property instead of repointing the result's prototype.
+  return Object.fromEntries(merged);
 }
 
 function mergeTypeObservation(a: TypeObservation, b: TypeObservation): TypeObservation {
@@ -181,13 +189,15 @@ function mergeTypeBuckets(
   base: Record<string, TypeObservation>,
   incoming: Record<string, TypeObservation>,
 ): Record<string, TypeObservation> {
-  const merged: Record<string, TypeObservation> = { ...base };
+  // Same Map-based reasoning as mergeFields above: `key` is a transcript `type`/
+  // `type:subtype` bucket name — corpus-derived text too, so it gets the same protection
+  // against colliding with an inherited Object.prototype member name.
+  const merged = new Map(Object.entries(base));
   for (const [key, bucket] of Object.entries(incoming)) {
-    // Same reasoning as mergeFields above: check key presence via `in`, not a
-    // truthy-check on the indexed value.
-    merged[key] = key in base ? mergeTypeObservation(base[key], bucket) : bucket;
+    const existing = merged.get(key);
+    merged.set(key, existing === undefined ? bucket : mergeTypeObservation(existing, bucket));
   }
-  return merged;
+  return Object.fromEntries(merged);
 }
 
 /** Merges `incoming` into `base`, additive-only: every field/type/version fact already in

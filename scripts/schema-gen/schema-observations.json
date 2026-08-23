@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-22T21:52:14.349Z",
+  "generatedAt": "2026-08-22T22:41:12.041Z",
   "cliVersionsObserved": [
     "2.1.215",
     "2.1.218",
@@ -25,7 +25,7 @@
   ],
   "types": {
     "queue-operation": {
-      "sampleCount": 16618,
+      "sampleCount": 16650,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -33,7 +33,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 16618,
+          "presentCount": 16650,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -41,7 +41,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 16618,
+          "presentCount": 16650,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -49,7 +49,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 16618,
+          "presentCount": 16650,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -57,7 +57,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 16618,
+          "presentCount": 16650,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -65,14 +65,14 @@
           "types": [
             "string"
           ],
-          "presentCount": 7495,
+          "presentCount": 7509,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
       }
     },
     "attachment": {
-      "sampleCount": 212007,
+      "sampleCount": 212382,
       "firstSeenVersion": "2.1.215",
       "lastSeenVersion": "2.1.240",
       "fields": {
@@ -81,7 +81,7 @@
             "object",
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -89,7 +89,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -97,7 +97,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -105,7 +105,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -113,7 +113,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 176625,
+          "presentCount": 176889,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -121,7 +121,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 177391,
+          "presentCount": 177659,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -129,7 +129,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 176625,
+          "presentCount": 176889,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -138,7 +138,7 @@
             "object",
             "string"
           ],
-          "presentCount": 188702,
+          "presentCount": 188980,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -146,7 +146,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 149061,
+          "presentCount": 149272,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -154,7 +154,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 149061,
+          "presentCount": 149272,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -162,7 +162,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 149061,
+          "presentCount": 149272,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -170,7 +170,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 149063,
+          "presentCount": 149274,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -178,7 +178,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 149080,
+          "presentCount": 149291,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -186,7 +186,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -194,7 +194,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -202,7 +202,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -210,7 +210,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -218,7 +218,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -226,7 +226,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -234,7 +234,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -242,7 +242,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -250,7 +250,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 212007,
+          "presentCount": 212382,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -259,7 +259,7 @@
             "object",
             "string"
           ],
-          "presentCount": 28007,
+          "presentCount": 28058,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -267,7 +267,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 5838,
+          "presentCount": 5849,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -275,7 +275,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5716,
+          "presentCount": 5727,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -283,7 +283,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 6791,
+          "presentCount": 6806,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -291,7 +291,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 6668,
+          "presentCount": 6683,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -299,7 +299,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 5838,
+          "presentCount": 5849,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -307,7 +307,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 5333,
+          "presentCount": 5344,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -315,7 +315,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1509,
+          "presentCount": 1513,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -323,7 +323,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1501,
+          "presentCount": 1505,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -339,7 +339,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1458,
+          "presentCount": 1462,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -347,7 +347,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1454,
+          "presentCount": 1458,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -355,7 +355,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1458,
+          "presentCount": 1462,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -363,7 +363,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 6915,
+          "presentCount": 6930,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -371,7 +371,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 1458,
+          "presentCount": 1462,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -395,7 +395,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 5457,
+          "presentCount": 5468,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -403,7 +403,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 5457,
+          "presentCount": 5468,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -411,7 +411,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5457,
+          "presentCount": 5468,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -419,7 +419,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 813,
+          "presentCount": 815,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -427,7 +427,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 3927,
+          "presentCount": 3929,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -435,7 +435,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3929,
+          "presentCount": 3930,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -443,7 +443,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3929,
+          "presentCount": 3930,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -451,7 +451,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4013,
+          "presentCount": 4014,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -459,7 +459,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3929,
+          "presentCount": 3930,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -467,7 +467,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 3929,
+          "presentCount": 3930,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -475,7 +475,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4045,
+          "presentCount": 4046,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -531,7 +531,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 201,
+          "presentCount": 202,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -612,7 +612,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 18742,
+          "presentCount": 18774,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -620,7 +620,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 9504,
+          "presentCount": 9579,
           "firstSeenVersion": "2.1.229",
           "lastSeenVersion": "2.1.240"
         },
@@ -668,7 +668,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 795,
+          "presentCount": 796,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -676,7 +676,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 795,
+          "presentCount": 796,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -684,7 +684,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 795,
+          "presentCount": 796,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -692,7 +692,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 795,
+          "presentCount": 796,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -700,7 +700,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 795,
+          "presentCount": 796,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -708,7 +708,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 795,
+          "presentCount": 796,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -732,7 +732,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 565,
+          "presentCount": 568,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -740,7 +740,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 564,
+          "presentCount": 567,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -996,7 +996,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 29650,
+          "presentCount": 29739,
           "firstSeenVersion": "2.1.220",
           "lastSeenVersion": "2.1.239"
         },
@@ -1267,7 +1267,7 @@
       }
     },
     "user": {
-      "sampleCount": 196915,
+      "sampleCount": 197472,
       "firstSeenVersion": "2.1.215",
       "lastSeenVersion": "2.1.240",
       "fields": {
@@ -1276,7 +1276,7 @@
             "object",
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1284,7 +1284,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1292,7 +1292,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196876,
+          "presentCount": 197433,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1300,7 +1300,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1308,7 +1308,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1316,7 +1316,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1325,7 +1325,7 @@
             "object",
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1333,7 +1333,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1341,7 +1341,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1349,7 +1349,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1357,7 +1357,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1365,7 +1365,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1373,7 +1373,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1381,7 +1381,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1389,7 +1389,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 196915,
+          "presentCount": 197472,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1397,7 +1397,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 185441,
+          "presentCount": 185968,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1405,7 +1405,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 185441,
+          "presentCount": 185968,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1413,7 +1413,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3461,
+          "presentCount": 3467,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1421,7 +1421,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 4261,
+          "presentCount": 4274,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1429,7 +1429,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 181980,
+          "presentCount": 182501,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1438,7 +1438,7 @@
             "object",
             "string"
           ],
-          "presentCount": 181980,
+          "presentCount": 182501,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1446,7 +1446,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 99507,
+          "presentCount": 99759,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1455,7 +1455,7 @@
             "object",
             "string"
           ],
-          "presentCount": 57249,
+          "presentCount": 57345,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1463,7 +1463,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 24546,
+          "presentCount": 24578,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1471,7 +1471,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 24546,
+          "presentCount": 24578,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1479,7 +1479,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 24546,
+          "presentCount": 24578,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1487,7 +1487,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 24546,
+          "presentCount": 24578,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1495,7 +1495,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 24546,
+          "presentCount": 24578,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1503,7 +1503,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 181980,
+          "presentCount": 182501,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1583,7 +1583,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 6539,
+          "presentCount": 6547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1671,7 +1671,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 9808,
+          "presentCount": 9835,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1679,7 +1679,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 8816,
+          "presentCount": 8838,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1687,7 +1687,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 8786,
+          "presentCount": 8808,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1695,7 +1695,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 8786,
+          "presentCount": 8808,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1703,7 +1703,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 8786,
+          "presentCount": 8808,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1711,7 +1711,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 8786,
+          "presentCount": 8808,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1719,7 +1719,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 8786,
+          "presentCount": 8808,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1759,7 +1759,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 816,
+          "presentCount": 817,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1767,7 +1767,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 393,
+          "presentCount": 394,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -1775,7 +1775,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 772,
+          "presentCount": 776,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -1855,7 +1855,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 2498,
+          "presentCount": 2505,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1863,7 +1863,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3815,
+          "presentCount": 3822,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1871,7 +1871,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3815,
+          "presentCount": 3822,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1879,7 +1879,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2498,
+          "presentCount": 2505,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1887,7 +1887,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3805,
+          "presentCount": 3812,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1895,7 +1895,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3805,
+          "presentCount": 3812,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1903,7 +1903,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2498,
+          "presentCount": 2505,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1911,7 +1911,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 2498,
+          "presentCount": 2505,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1919,7 +1919,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5611,
+          "presentCount": 5626,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1927,7 +1927,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 4774,
+          "presentCount": 4786,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1935,7 +1935,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4774,
+          "presentCount": 4786,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -1943,7 +1943,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5612,
+          "presentCount": 5627,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -1951,7 +1951,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 686,
+          "presentCount": 687,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -2015,9 +2015,9 @@
           "types": [
             "string"
           ],
-          "presentCount": 991,
+          "presentCount": 993,
           "firstSeenVersion": "2.1.218",
-          "lastSeenVersion": "2.1.239"
+          "lastSeenVersion": "2.1.240"
         },
         "toolUseResult.agentType": {
           "types": [
@@ -2032,7 +2032,7 @@
             "object",
             "string"
           ],
-          "presentCount": 3477,
+          "presentCount": 3483,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -2328,7 +2328,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3450,
+          "presentCount": 3455,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2353,7 +2353,7 @@
             "object",
             "string"
           ],
-          "presentCount": 3426,
+          "presentCount": 3431,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2361,7 +2361,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 3426,
+          "presentCount": 3431,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2425,7 +2425,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 3426,
+          "presentCount": 3431,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2441,7 +2441,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 136795,
+          "presentCount": 137247,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2489,7 +2489,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1432,
+          "presentCount": 1435,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2497,7 +2497,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 499,
+          "presentCount": 501,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2505,7 +2505,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 499,
+          "presentCount": 501,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -2545,7 +2545,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 62,
+          "presentCount": 67,
           "firstSeenVersion": "2.1.238",
           "lastSeenVersion": "2.1.239"
         },
@@ -2802,7 +2802,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 556,
+          "presentCount": 558,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -2810,7 +2810,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 556,
+          "presentCount": 558,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -2818,7 +2818,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 556,
+          "presentCount": 558,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -2826,7 +2826,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 191,
+          "presentCount": 193,
           "firstSeenVersion": "2.1.228",
           "lastSeenVersion": "2.1.239"
         },
@@ -2850,7 +2850,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2146,
+          "presentCount": 2151,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2858,7 +2858,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 2588,
+          "presentCount": 2596,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2866,7 +2866,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 2588,
+          "presentCount": 2596,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2874,7 +2874,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 1175,
+          "presentCount": 1176,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2882,7 +2882,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 1175,
+          "presentCount": 1176,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2898,7 +2898,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1285,
+          "presentCount": 1292,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2906,7 +2906,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 968,
+          "presentCount": 972,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2914,7 +2914,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 565,
+          "presentCount": 568,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2986,7 +2986,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 498,
+          "presentCount": 501,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -2994,7 +2994,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 443,
+          "presentCount": 446,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -3002,7 +3002,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 442,
+          "presentCount": 445,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -3010,7 +3010,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 442,
+          "presentCount": 445,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -3018,9 +3018,9 @@
           "types": [
             "number"
           ],
-          "presentCount": 158,
+          "presentCount": 159,
           "firstSeenVersion": "2.1.218",
-          "lastSeenVersion": "2.1.238"
+          "lastSeenVersion": "2.1.240"
         },
         "toolUseResult.url": {
           "types": [
@@ -3965,7 +3965,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 16218,
+          "presentCount": 16394,
           "firstSeenVersion": "2.1.220",
           "lastSeenVersion": "2.1.239"
         },
@@ -5836,7 +5836,7 @@
       }
     },
     "file-history-snapshot": {
-      "sampleCount": 3347,
+      "sampleCount": 3353,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -5844,7 +5844,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5852,7 +5852,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5860,7 +5860,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5868,7 +5868,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5876,7 +5876,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5884,7 +5884,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5892,7 +5892,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 3347,
+          "presentCount": 3353,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5900,7 +5900,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1243,
+          "presentCount": 1245,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -5911,91 +5911,11 @@
           "presentCount": 5,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.NOTICE": {
-          "types": [
-            "object"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.NOTICE.backupFileName": {
-          "types": [
-            "string"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.NOTICE.version": {
-          "types": [
-            "number"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.NOTICE.backupTime": {
-          "types": [
-            "string"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.NOTICE.realParentDir": {
-          "types": [
-            "string"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.LICENSE": {
-          "types": [
-            "object"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.LICENSE.backupFileName": {
-          "types": [
-            "string"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.LICENSE.version": {
-          "types": [
-            "number"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.LICENSE.backupTime": {
-          "types": [
-            "string"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
-        },
-        "snapshot.trackedFileBackups.LICENSE.realParentDir": {
-          "types": [
-            "string"
-          ],
-          "presentCount": 5,
-          "firstSeenVersion": "",
-          "lastSeenVersion": ""
         }
       }
     },
     "last-prompt": {
-      "sampleCount": 19740,
+      "sampleCount": 19776,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -6003,7 +5923,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 19740,
+          "presentCount": 19776,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -6011,7 +5931,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 19740,
+          "presentCount": 19776,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -6019,7 +5939,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 19740,
+          "presentCount": 19776,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -6027,14 +5947,14 @@
           "types": [
             "string"
           ],
-          "presentCount": 18855,
+          "presentCount": 18891,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
       }
     },
     "assistant": {
-      "sampleCount": 331298,
+      "sampleCount": 332252,
       "firstSeenVersion": "2.1.215",
       "lastSeenVersion": "2.1.240",
       "fields": {
@@ -6042,7 +5962,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6050,7 +5970,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6058,7 +5978,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6066,7 +5986,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6074,7 +5994,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6082,7 +6002,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6090,7 +6010,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6098,7 +6018,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6106,7 +6026,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6114,7 +6034,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6122,7 +6042,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 102507,
+          "presentCount": 102817,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6130,7 +6050,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 102507,
+          "presentCount": 102817,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6139,7 +6059,7 @@
             "object",
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6148,7 +6068,7 @@
             "object",
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6156,7 +6076,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6164,7 +6084,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6172,7 +6092,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6180,7 +6100,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6188,7 +6108,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6196,7 +6116,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6204,7 +6124,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 178052,
+          "presentCount": 178541,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6212,7 +6132,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 178052,
+          "presentCount": 178541,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6220,7 +6140,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 178052,
+          "presentCount": 178541,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6229,7 +6149,7 @@
             "object",
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6237,7 +6157,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6245,7 +6165,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6253,7 +6173,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6262,7 +6182,7 @@
             "object",
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6270,7 +6190,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 178052,
+          "presentCount": 178541,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6278,7 +6198,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6286,7 +6206,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6294,7 +6214,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6302,7 +6222,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6310,7 +6230,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6318,7 +6238,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6326,7 +6246,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 177953,
+          "presentCount": 178442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6335,7 +6255,7 @@
             "object",
             "string"
           ],
-          "presentCount": 178052,
+          "presentCount": 178541,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6343,7 +6263,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 331257,
+          "presentCount": 332211,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6351,7 +6271,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331259,
+          "presentCount": 332213,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6359,7 +6279,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 108385,
+          "presentCount": 108529,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6367,7 +6287,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6375,7 +6295,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6383,7 +6303,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6391,7 +6311,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 310588,
+          "presentCount": 311542,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6399,7 +6319,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6407,7 +6327,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6415,7 +6335,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6423,7 +6343,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6431,7 +6351,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6439,7 +6359,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 331298,
+          "presentCount": 332252,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6447,7 +6367,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 46885,
+          "presentCount": 47008,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6455,7 +6375,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 181918,
+          "presentCount": 182439,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6463,7 +6383,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 181918,
+          "presentCount": 182439,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6471,7 +6391,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 181918,
+          "presentCount": 182439,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6479,7 +6399,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 97283,
+          "presentCount": 97530,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6487,7 +6407,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 90123,
+          "presentCount": 90376,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6495,7 +6415,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 181918,
+          "presentCount": 182439,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6503,7 +6423,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 181918,
+          "presentCount": 182439,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6519,7 +6439,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2467,
+          "presentCount": 2468,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6527,7 +6447,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 1549,
+          "presentCount": 1550,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6543,7 +6463,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 68305,
+          "presentCount": 68551,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6551,7 +6471,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 772,
+          "presentCount": 776,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6559,7 +6479,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 336,
+          "presentCount": 337,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6568,7 +6488,7 @@
             "number",
             "object"
           ],
-          "presentCount": 8190,
+          "presentCount": 8220,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6577,7 +6497,7 @@
             "number",
             "string"
           ],
-          "presentCount": 7975,
+          "presentCount": 7983,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6601,7 +6521,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4065,
+          "presentCount": 4072,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6609,7 +6529,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2313,
+          "presentCount": 2320,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6617,7 +6537,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4753,
+          "presentCount": 4760,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6625,7 +6545,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 9814,
+          "presentCount": 9844,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.240"
         },
@@ -6641,7 +6561,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 3253,
+          "presentCount": 3257,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6674,7 +6594,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 14031,
+          "presentCount": 14098,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6682,7 +6602,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 14042,
+          "presentCount": 14109,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6690,7 +6610,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 14040,
+          "presentCount": 14107,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6698,7 +6618,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 54070,
+          "presentCount": 54206,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6706,7 +6626,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4427,
+          "presentCount": 4442,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6714,7 +6634,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 230390,
+          "presentCount": 231185,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6722,7 +6642,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 228720,
+          "presentCount": 229515,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -6770,7 +6690,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 80912,
+          "presentCount": 81401,
           "firstSeenVersion": "2.1.228",
           "lastSeenVersion": "2.1.240"
         },
@@ -6778,7 +6698,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 80882,
+          "presentCount": 81371,
           "firstSeenVersion": "2.1.228",
           "lastSeenVersion": "2.1.240"
         },
@@ -6794,7 +6714,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 8184,
+          "presentCount": 8191,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6802,7 +6722,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 8184,
+          "presentCount": 8191,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6810,7 +6730,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1947,
+          "presentCount": 1949,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -6818,7 +6738,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 3921,
+          "presentCount": 3924,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.239"
         },
@@ -6826,7 +6746,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2799,
+          "presentCount": 2811,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -6834,7 +6754,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2287,
+          "presentCount": 2292,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -6860,7 +6780,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 599,
+          "presentCount": 603,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -6869,7 +6789,7 @@
             "number",
             "string"
           ],
-          "presentCount": 354,
+          "presentCount": 355,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.240"
         },
@@ -7265,7 +7185,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 27723,
+          "presentCount": 28041,
           "firstSeenVersion": "2.1.220",
           "lastSeenVersion": "2.1.239"
         },
@@ -7506,7 +7426,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 72,
+          "presentCount": 76,
           "firstSeenVersion": "2.1.218",
           "lastSeenVersion": "2.1.238"
         },
@@ -7650,7 +7570,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 2,
+          "presentCount": 6,
           "firstSeenVersion": "2.1.220",
           "lastSeenVersion": "2.1.238"
         },
@@ -7745,7 +7665,7 @@
       }
     },
     "system:stop_hook_summary": {
-      "sampleCount": 4535,
+      "sampleCount": 4547,
       "firstSeenVersion": "2.1.215",
       "lastSeenVersion": "2.1.239",
       "fields": {
@@ -7753,7 +7673,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7761,7 +7681,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7769,7 +7689,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7777,7 +7697,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7785,7 +7705,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7793,7 +7713,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7801,7 +7721,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7809,7 +7729,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7817,7 +7737,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7825,7 +7745,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7833,7 +7753,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7841,7 +7761,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7849,7 +7769,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7857,7 +7777,7 @@
           "types": [
             "boolean"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7865,7 +7785,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7873,7 +7793,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7881,7 +7801,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7889,7 +7809,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7897,7 +7817,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7905,7 +7825,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7913,7 +7833,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7921,7 +7841,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7929,7 +7849,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7937,7 +7857,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 4535,
+          "presentCount": 4547,
           "firstSeenVersion": "2.1.215",
           "lastSeenVersion": "2.1.239"
         },
@@ -7969,14 +7889,14 @@
           "types": [
             "string"
           ],
-          "presentCount": 506,
+          "presentCount": 509,
           "firstSeenVersion": "2.1.220",
           "lastSeenVersion": "2.1.239"
         }
       }
     },
     "file-history-delta": {
-      "sampleCount": 1664,
+      "sampleCount": 1669,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -7984,7 +7904,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -7992,7 +7912,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8000,7 +7920,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8008,7 +7928,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8016,7 +7936,7 @@
           "types": [
             "object"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8025,7 +7945,7 @@
             "object",
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8033,7 +7953,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8041,7 +7961,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8049,7 +7969,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1661,
+          "presentCount": 1666,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8057,7 +7977,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1664,
+          "presentCount": 1669,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
@@ -8095,7 +8015,7 @@
       }
     },
     "ai-title": {
-      "sampleCount": 14009,
+      "sampleCount": 14033,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -8103,7 +8023,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 14009,
+          "presentCount": 14033,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8111,7 +8031,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 14009,
+          "presentCount": 14033,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8119,14 +8039,14 @@
           "types": [
             "string"
           ],
-          "presentCount": 14009,
+          "presentCount": 14033,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
       }
     },
     "pr-link": {
-      "sampleCount": 5237,
+      "sampleCount": 5244,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -8134,7 +8054,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5237,
+          "presentCount": 5244,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8142,7 +8062,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5237,
+          "presentCount": 5244,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8150,7 +8070,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 5237,
+          "presentCount": 5244,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8158,7 +8078,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5237,
+          "presentCount": 5244,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8166,7 +8086,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5237,
+          "presentCount": 5244,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8174,14 +8094,14 @@
           "types": [
             "string"
           ],
-          "presentCount": 5237,
+          "presentCount": 5244,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
       }
     },
     "atis-latch": {
-      "sampleCount": 1410,
+      "sampleCount": 1446,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -8189,7 +8109,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1410,
+          "presentCount": 1446,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8197,7 +8117,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1410,
+          "presentCount": 1446,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8205,7 +8125,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 1410,
+          "presentCount": 1446,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
@@ -8578,7 +8498,7 @@
       }
     },
     "frame-link": {
-      "sampleCount": 70,
+      "sampleCount": 85,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -8586,7 +8506,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 70,
+          "presentCount": 85,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8594,7 +8514,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 70,
+          "presentCount": 85,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8626,7 +8546,7 @@
           "types": [
             "number"
           ],
-          "presentCount": 65,
+          "presentCount": 80,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8634,7 +8554,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 70,
+          "presentCount": 85,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
@@ -8885,7 +8805,7 @@
       }
     },
     "custom-title": {
-      "sampleCount": 6498,
+      "sampleCount": 6503,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -8893,7 +8813,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 6498,
+          "presentCount": 6503,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8901,7 +8821,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 6498,
+          "presentCount": 6503,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8909,14 +8829,14 @@
           "types": [
             "string"
           ],
-          "presentCount": 6498,
+          "presentCount": 6503,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }
       }
     },
     "agent-name": {
-      "sampleCount": 5881,
+      "sampleCount": 5886,
       "firstSeenVersion": "",
       "lastSeenVersion": "",
       "fields": {
@@ -8924,7 +8844,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5881,
+          "presentCount": 5886,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8932,7 +8852,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5881,
+          "presentCount": 5886,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         },
@@ -8940,7 +8860,7 @@
           "types": [
             "string"
           ],
-          "presentCount": 5881,
+          "presentCount": 5886,
           "firstSeenVersion": "",
           "lastSeenVersion": ""
         }

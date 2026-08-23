@@ -87,4 +87,51 @@ describe('redact', () => {
     // The unsafe key itself is redacted too, using its own counter.
     expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
   });
+
+  // Finding A: each of these looks like a plain identifier but is really an inherited
+  // Object.prototype member. Used directly as an ordinary object key (not inside a known
+  // dynamic-key container — that's the separate Finding B case below), redact() must not
+  // crash, must not leak the original key or its value, and — the sharpest case, `__proto__`
+  // specifically — must not actually repoint the object's real prototype.
+  it.each([
+    'constructor',
+    'toString',
+    '__proto__',
+    'hasOwnProperty',
+    'valueOf',
+    'isPrototypeOf',
+    'toLocaleString',
+    'propertyIsEnumerable',
+  ])(
+    'redacts an Object.prototype member name (%j) used as a key instead of crashing or corrupting the object',
+    (protoKey) => {
+      const line = { type: 'tool_result', toolUseResult: { status: 'success' as const, [protoKey]: 'leaked value' } };
+
+      const result = redact(line);
+      const serialized = JSON.stringify(result);
+
+      expect(result.toolUseResult.status).toBe('success');
+      expect(Object.getPrototypeOf(result.toolUseResult)).toBe(Object.prototype);
+      expect(serialized).not.toContain('leaked value');
+      expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+    },
+  );
+
+  // Finding B: a bare, punctuation-free real value (a tracked filename, an option label)
+  // passes isSchemaLikeKey on shape alone, but every child of a known dynamic-key-map
+  // container must be treated as unsafe regardless — this is the real LICENSE/NOTICE case
+  // already observed in the committed src/generated/transcriptShapes.ts before this fix.
+  it.each(['answers', 'trackedFileBackups', 'artifacts', '_meta'])(
+    'redacts a bare, identifier-shaped child key under the known dynamic-key container %j instead of keeping it literally',
+    (containerKey) => {
+      const line = { type: 'tool_result', [containerKey]: { LICENSE: 'real tracked content' } };
+
+      const result = redact(line);
+      const serialized = JSON.stringify(result);
+
+      expect(serialized).not.toContain('LICENSE');
+      expect(serialized).not.toContain('real tracked content');
+      expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+    },
+  );
 });

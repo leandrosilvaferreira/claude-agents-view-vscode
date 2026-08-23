@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as ts from 'typescript';
 import { generateTsReference } from './generateTsReference';
 import { createEmptyModel, FieldObservation, SchemaObservationModel, TypeObservation } from './schemaModel';
 
@@ -134,5 +135,36 @@ describe('generateTsReference', () => {
     });
 
     expect(generateTsReference(model)).toBe(generateTsReference(model));
+  });
+});
+
+// Sibling top-level describe (not nested in the one above) so its line count doesn't push
+// that describe past this repo's max-lines-per-function limit.
+describe('generateTsReference — comment-injection escaping (Finding C)', () => {
+  it('escapes a comment-close sequence in a type key and in an observed version so it cannot break out of the generated JSDoc comment', () => {
+    const payload = 'evil*/export const HACKED = 1; /*';
+    const model = makeModel({
+      cliVersionsObserved: [payload],
+      types: {
+        [payload]: makeTypeObservation({
+          firstSeenVersion: payload,
+          lastSeenVersion: payload,
+          fields: { type: makeField() },
+        }),
+      },
+    });
+
+    const output = generateTsReference(model);
+
+    // The raw payload must never appear verbatim: the comment-close sequence it contains has
+    // to be split apart wherever the payload was interpolated (type key, version range, CLI
+    // versions observed).
+    expect(output).not.toContain(payload);
+    // The file must still be one well-formed TS module once corpus text has traveled through
+    // the generator — the strongest proof the escape actually holds, not just this test's
+    // specific payload. transpileModule's own reported diagnostics (the public API's way of
+    // surfacing a syntax error) must be empty.
+    const { diagnostics } = ts.transpileModule(output, { reportDiagnostics: true });
+    expect(diagnostics ?? []).toEqual([]);
   });
 });

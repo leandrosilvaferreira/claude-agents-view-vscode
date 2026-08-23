@@ -22,9 +22,14 @@
  * `Sample key N` placeholder (a counter kept separate from the value counter's `Sample text N`,
  * so neither numbering leaks anything about the other), and its whole value is replaced wholesale
  * rather than walked — nothing under an unsafe key can be assumed to be normal structure.
+ * `isSchemaLikeKey` only judges a key by its own shape, though, which a short, punctuation-free
+ * real value (a tracked filename, a bare-word answer label) can pass without actually being a
+ * safe field name — so for the known dynamic-key-map container fields
+ * (`KNOWN_DYNAMIC_KEY_CONTAINERS`, keySafety.ts), every child key is forced unsafe regardless of
+ * shape (the `forceDynamicKey` parameter below), not just the ones that fail the regex.
  */
 
-import { isSchemaLikeKey } from './keySafety';
+import { isKnownDynamicKeyContainer, isSchemaLikeKey } from './keySafety';
 
 /** Key names whose string value is a known closed set (not free text) and survives unchanged. */
 const ALLOWLISTED_KEYS: ReadonlySet<string> = new Set(['type', 'role', 'status']);
@@ -45,7 +50,11 @@ function redactValue(value: unknown, key: string | undefined, counters: Redactio
     return value.map((item) => redactValue(item, undefined, counters));
   }
   if (isPlainObject(value)) {
-    return redactObject(value, counters);
+    // Known dynamic-key-map container (e.g. toolUseResult.answers) — every key inside `value`
+    // is unconditionally unsafe content, regardless of what an individual key looks like
+    // (Finding B: a short, punctuation-free real value like a tracked filename would otherwise
+    // pass isSchemaLikeKey and leak through).
+    return redactObject(value, counters, key !== undefined && isKnownDynamicKeyContainer(key));
   }
   if (typeof value !== 'string' || value === '') {
     return value; // non-strings and empty strings carry nothing to redact
@@ -56,16 +65,28 @@ function redactValue(value: unknown, key: string | undefined, counters: Redactio
   return `Sample text ${counters.nextId()}`;
 }
 
-function redactObject(obj: Record<string, unknown>, counters: RedactionCounters): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+function redactObject(
+  obj: Record<string, unknown>,
+  counters: RedactionCounters,
+  forceDynamicKey = false,
+): Record<string, unknown> {
+  // Map, not a plain-object accumulator: `key` below is corpus-derived text, and
+  // `result[key] = ...` on a plain `{}` is unsafe for `key === '__proto__'` specifically —
+  // Object.prototype's inherited `__proto__` *setter* fires on that assignment and repoints
+  // `result`'s own prototype instead of creating an own property. keySafety.ts's own guard
+  // already rejects that key today, but this accumulator doesn't rely on that alone (defense
+  // in depth, per review) — a Map has no such setter to trigger no matter what `key` is, and
+  // Object.fromEntries at the end uses CreateDataPropertyOrThrow (not [[Set]]), so a
+  // `__proto__` entry always lands as a genuine own property (verified).
+  const result = new Map<string, unknown>();
   for (const [key, value] of Object.entries(obj)) {
-    if (!isSchemaLikeKey(key)) {
-      result[`Sample key ${counters.nextKeyId()}`] = `Sample text ${counters.nextId()}`;
+    if (forceDynamicKey || !isSchemaLikeKey(key)) {
+      result.set(`Sample key ${counters.nextKeyId()}`, `Sample text ${counters.nextId()}`);
       continue;
     }
-    result[key] = redactValue(value, key, counters);
+    result.set(key, redactValue(value, key, counters));
   }
-  return result;
+  return Object.fromEntries(result);
 }
 
 /**

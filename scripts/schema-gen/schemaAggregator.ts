@@ -1,5 +1,5 @@
 import { ParseError, WalkResult } from './corpusWalker';
-import { isSchemaLikeKey } from './keySafety';
+import { isKnownDynamicKeyContainer, isSchemaLikeKey } from './keySafety';
 import {
   createEmptyModel,
   mergeSchemaObservations,
@@ -24,14 +24,18 @@ import {
  * itself; `Array.isArray`/`isPlainObject` below only decide *recursion* strategy, never what
  * string gets recorded.
  *
- * Three structural safeguards keep one pathological line (e.g. a huge `tool_use` payload) from
+ * Structural safeguards keep one pathological line (e.g. a huge `tool_use` payload) from
  * blowing up the field-path space (transcript-schema-gen.md, "Data Shapes"): recursion stops
  * at MAX_FIELD_DEPTH, every array's contents collapse onto one trailing `[]` path segment
  * instead of exploding into per-index paths, and an object key that isn't a plain identifier
  * (see keySafety.ts — e.g. `toolUseResult.answers`, keyed by literal AskUserQuestion question
  * text) collapses onto one trailing `[dynamic-key]` segment instead of leaking its literal text
  * into the path; recursion also stops there, since nothing under an unsafe key can be assumed to
- * be normal structure.
+ * be normal structure. A fourth safeguard covers a key that *looks* safe but isn't: every child
+ * of a known dynamic-key-map container field (keySafety.ts's `KNOWN_DYNAMIC_KEY_CONTAINERS` —
+ * `answers`, `trackedFileBackups`, `artifacts`, `_meta`) collapses the same way regardless of
+ * its own shape, since a short, punctuation-free real value (a tracked filename, a bare-word
+ * answer) would otherwise pass the identifier check and leak through anyway.
  */
 
 /** Top-level fields are depth 1; nesting stops recording once a path reaches this depth. */
@@ -88,17 +92,40 @@ function mergeFieldMaps(
   base: Record<string, FieldObservation>,
   incoming: Record<string, FieldObservation>,
 ): Record<string, FieldObservation> {
-  const merged: Record<string, FieldObservation> = { ...base };
+  // Map, not a plain-object accumulator: a field path is built from a transcript's own key
+  // text (see walkValue/collectFields below), so it must never be trusted to avoid colliding
+  // with an inherited Object.prototype member name (`toString`, `constructor`, ...) — a plain
+  // `{}` accumulator would misread `path in base` as true via the prototype chain even when
+  // `path` was never actually recorded, and merge the *inherited built-in* as if it were a
+  // real FieldObservation. A `Map` has no prototype chain, so this class of bug can't happen
+  // here regardless of whether keySafety.ts's own guard is correct (defense in depth — two
+  // independent reviewers flagged this exact accumulator and asked that it not rely on the
+  // upstream regex gate alone). Mirrors diffLogEntry.ts's sumPresentCountsByTopLevelField /
+  // generateFixtures.ts's samplesByBucket, the same pattern already used elsewhere in this tree.
+  const merged = new Map(Object.entries(base));
   for (const [path, observation] of Object.entries(incoming)) {
-    merged[path] = path in base ? combineSameLineFieldObservations(base[path], observation) : observation;
+    const existing = merged.get(path);
+    merged.set(path, existing === undefined ? observation : combineSameLineFieldObservations(existing, observation));
   }
-  return merged;
+  // Object.fromEntries uses CreateDataPropertyOrThrow, not [[Set]] — a `__proto__` entry
+  // always lands as a genuine own property instead of repointing the result's prototype
+  // (verified), so this materialization step is itself safe regardless of what `path` is.
+  return Object.fromEntries(merged);
 }
 
 interface WalkContext {
   path: string;
   depth: number;
   version: string;
+  /** Set only when this value is itself the value of a known dynamic-key-map container field
+   * (KNOWN_DYNAMIC_KEY_CONTAINERS, keySafety.ts). When true, every one of this object's own
+   * keys collapses onto DYNAMIC_KEY_SEGMENT unconditionally, without ever consulting
+   * isSchemaLikeKey — a short, punctuation-free real value (a tracked filename, a bare-word
+   * answer) would otherwise pass the identifier-shape regex and leak through even though the
+   * field itself is known to be keyed by arbitrary content, not a fixed schema (Finding B).
+   * Never needs to propagate past one level: a key that collapses here is never recursed into,
+   * exactly like the ordinary `!isSchemaLikeKey(key)` case below already doesn't recurse. */
+  forceDynamicKey?: boolean;
 }
 
 /** One value at `ctx.path`, plus (below MAX_FIELD_DEPTH) everything nested inside it. */
@@ -119,10 +146,13 @@ function walkValue(value: unknown, ctx: WalkContext): Record<string, FieldObserv
   }
   if (isPlainObject(value)) {
     for (const [key, nested] of Object.entries(value)) {
-      if (!isSchemaLikeKey(key)) {
-        // Key itself is content-derived (e.g. AskUserQuestion's `answers`, keyed by the literal
-        // question text) — collapse it onto a fixed placeholder and record only that a field was
-        // present, without recursing into whatever's underneath it.
+      if (ctx.forceDynamicKey || !isSchemaLikeKey(key)) {
+        // Key is content-derived — either it fails the identifier-shape check outright (e.g.
+        // AskUserQuestion's `answers`, keyed by the literal question text), or this whole
+        // object is a known dynamic-key container (ctx.forceDynamicKey) whose keys are never
+        // trustworthy no matter their shape (Finding B). Either way: collapse it onto a fixed
+        // placeholder and record only that a field was present, without recursing into
+        // whatever's underneath it.
         fields = mergeFieldMaps(fields, {
           [`${ctx.path}.${DYNAMIC_KEY_SEGMENT}`]: newFieldObservation(nested, ctx.version),
         });
@@ -130,7 +160,12 @@ function walkValue(value: unknown, ctx: WalkContext): Record<string, FieldObserv
       }
       fields = mergeFieldMaps(
         fields,
-        walkValue(nested, { path: `${ctx.path}.${key}`, depth: ctx.depth + 1, version: ctx.version }),
+        walkValue(nested, {
+          path: `${ctx.path}.${key}`,
+          depth: ctx.depth + 1,
+          version: ctx.version,
+          forceDynamicKey: isKnownDynamicKeyContainer(key),
+        }),
       );
     }
     return fields;
@@ -145,7 +180,10 @@ function collectFields(value: Record<string, unknown>, version: string): Record<
       fields = mergeFieldMaps(fields, { [DYNAMIC_KEY_SEGMENT]: newFieldObservation(fieldValue, version) });
       continue;
     }
-    fields = mergeFieldMaps(fields, walkValue(fieldValue, { path: key, depth: 1, version }));
+    fields = mergeFieldMaps(
+      fields,
+      walkValue(fieldValue, { path: key, depth: 1, version, forceDynamicKey: isKnownDynamicKeyContainer(key) }),
+    );
   }
   return fields;
 }

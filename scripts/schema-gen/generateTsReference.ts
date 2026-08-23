@@ -65,6 +65,23 @@ function uniqueInterfaceName(key: string, used: Set<string>): string {
   return name;
 }
 
+/**
+ * Escapes corpus-derived text (a transcript's own `type`/`subtype`/`version` field) before
+ * it's interpolated into a generated block-comment doc string (renderInterface, renderHeader
+ * below) — never into code, where `renderField`'s `JSON.stringify(path)` quoting is already
+ * enough. `JSON.stringify` alone is not: it escapes quotes, backslashes and control
+ * characters, exactly what `renderField` needs for a *property name*, but it deliberately
+ * leaves `/` untouched — so a value containing the two-character comment-close sequence
+ * (asterisk immediately followed by slash) would still prematurely end the surrounding
+ * comment, no matter how it's quoted, since a comment's own terminator is recognized by the
+ * lexer scanning raw characters, with no notion of "inside a quoted string". Splitting that
+ * pair apart with a backslash is what actually closes the gap; comments ignore backslashes
+ * entirely, so this is inert as far as the reader is concerned.
+ */
+function escapeForComment(text: string): string {
+  return JSON.stringify(text).replace(/\*\//g, '*\\/');
+}
+
 function renderField(path: string, field: FieldObservation, sampleCount: number): string {
   const optional = field.presentCount < sampleCount;
   const propertyName = JSON.stringify(path); // quoted: paths contain dots and `[]` segments
@@ -83,14 +100,32 @@ function renderInterface(key: string, bucket: TypeObservation, used: Set<string>
   const fieldLines = Object.keys(bucket.fields)
     .sort()
     .map((path) => renderField(path, bucket.fields[path], bucket.sampleCount));
-  const doc = `/**\n * Transcript type \`${key}\`. Observed ${bucket.sampleCount} time(s), CLI ${renderVersionRange(bucket)}.\n */`;
+  // Both interpolations below are corpus-derived (key: a transcript's own type/subtype;
+  // renderVersionRange: its own version field) and must go through escapeForComment — see
+  // that function's doc comment. uniqueInterfaceName(key, ...) needs no such treatment: it
+  // already strips every non-alphanumeric character while deriving `name`, so `name` itself
+  // can never carry a `*/` through to the `export interface` line below.
+  const doc = `/**\n * Transcript type \`${escapeForComment(key)}\`. Observed ${bucket.sampleCount} time(s), CLI ${escapeForComment(renderVersionRange(bucket))}.\n */`;
   const body = fieldLines.length > 0 ? fieldLines.join('\n') : '  // no fields observed';
   return `${doc}\nexport interface ${name} {\n${body}\n}`;
 }
 
 function renderHeader(model: SchemaObservationModel): string {
+  // generatedAt is never corpus-derived (always `new Date().toISOString()`, stamped by
+  // generate.ts) so it needs no escaping. Each observed CLI version is corpus-derived, so it
+  // does — but escaping *each version string individually*, then joining with a literal ', '
+  // this function controls itself, rather than joining first and escaping the combined
+  // result: a real corpus routinely observes dozens of short version strings, and
+  // JSON.stringify-wrapping the whole joined list as one string turns an already-safe list of
+  // short tokens into a single long quoted blob (indistinguishable, to a length-based leak
+  // scan, from one long unredacted secret actually leaking through). Escaping per-element
+  // keeps each token's own length honest and still neutralizes a `*/` no matter which
+  // element it's hiding in.
   const generatedAt = model.generatedAt.length > 0 ? model.generatedAt : '(unknown)';
-  const versions = model.cliVersionsObserved.length > 0 ? model.cliVersionsObserved.join(', ') : '(none recorded)';
+  const versions =
+    model.cliVersionsObserved.length > 0
+      ? model.cliVersionsObserved.map(escapeForComment).join(', ')
+      : '(none recorded)';
   return [
     '/**',
     ` * ${BANNER}`,

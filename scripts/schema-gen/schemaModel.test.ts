@@ -131,6 +131,54 @@ describe('mergeSchemaObservations', () => {
   });
 });
 
+// Finding A structural defense-in-depth, for mergeFields/mergeTypeBuckets specifically. A
+// sibling top-level describe (not nested in the one above) so its line count doesn't push
+// that describe past this repo's max-lines-per-function limit. Reproduces the exact crash
+// two reviewers found: a plain-object accumulator's `key in base` resolves true through the
+// prototype chain even when `key` was never actually recorded, so the merge reads the
+// *inherited built-in* (e.g. the Object constructor function) as if it were a real
+// TypeObservation/FieldObservation, and eventually throws inside compareVersions reading
+// `.split` off a non-existent firstSeenVersion — reproduced with a bare
+// `{"type":"__proto__"}` transcript line, no nesting required.
+describe('mergeSchemaObservations — Object.prototype member names as type-bucket/field keys', () => {
+  const PROTO_MEMBER_NAMES = [
+    'constructor',
+    'toString',
+    '__proto__',
+    'hasOwnProperty',
+    'valueOf',
+    'isPrototypeOf',
+    'toLocaleString',
+    'propertyIsEnumerable',
+  ];
+
+  it.each(PROTO_MEMBER_NAMES)(
+    'merges a type bucket (and nested field) keyed %j against an empty baseline without crashing',
+    (protoKey) => {
+      const incoming = makeModel({
+        types: { [protoKey]: makeTypeObservation({ fields: { [protoKey]: makeField() } }) },
+      });
+
+      const merged = mergeSchemaObservations(createEmptyModel(), incoming);
+
+      expect(merged.types[protoKey]).toEqual(incoming.types[protoKey]);
+      expect(merged.types[protoKey].fields[protoKey]).toEqual(makeField());
+    },
+  );
+
+  it.each(PROTO_MEMBER_NAMES)(
+    'sums sampleCount across two batches sharing a type bucket keyed %j, instead of reading the inherited built-in',
+    (protoKey) => {
+      const base = makeModel({ types: { [protoKey]: makeTypeObservation({ sampleCount: 3 }) } });
+      const incoming = makeModel({ types: { [protoKey]: makeTypeObservation({ sampleCount: 2 }) } });
+
+      const merged = mergeSchemaObservations(base, incoming);
+
+      expect(merged.types[protoKey].sampleCount).toBe(5);
+    },
+  );
+});
+
 describe('loadSchemaObservations / saveSchemaObservations', () => {
   let testRoot: string;
 
