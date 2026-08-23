@@ -12,6 +12,7 @@ graphify-out/**
 docs/**
 scripts/**
 CLAUDE.md
+transcript-schema-gen.md
 .mcp.json
 .mcp.json.example
 .lsp.json
