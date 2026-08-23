@@ -74,8 +74,18 @@ export interface LogEntry {
   // nameExtractor.ts's extractRenamedTitle for why that must not be trusted as a real rename.
   customTitle?: string;
   // Present on a `type: 'worktree-state'` entry, written when a session enters a git worktree.
-  // `worktreeName` is the bare worktree name Claude Code later re-uses verbatim as an
-  // auto-stamped `customTitle` (see above) — tracked on `session.worktreeName` so that stamp can
-  // be recognized and ignored.
-  worktreeSession?: { worktreeName?: string };
+  // `worktreeName` is documented (and was, in an earlier real capture) as the name Claude Code
+  // later re-uses verbatim as an auto-stamped `customTitle` (see above) — but for a NESTED
+  // `<type>/<slug>` worktree layout (this project's own `.claude/worktrees/feat/787-saque-...`
+  // convention), real capture shows `worktreeName` holding only the bare leaf slug
+  // ("787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t", no "feat/" prefix) while the auto-stamp is
+  // actually drawn from the worktree's own PATH instead ("feat", the first segment after
+  // `worktrees/`) — `worktreeName` alone never matches it in that shape. `worktreePath` (the full
+  // absolute path Claude Code entered) is present alongside it in the same real capture and does
+  // carry that full nested shape, so projectPathResolver.ts's detectWorktreeName prefers deriving
+  // from it (same derivation as its cwd fallback) over trusting the bare `worktreeName` field.
+  // `null` is a real observed value too — Claude Code sends it on a `worktree-state` entry when
+  // a session relocates OUT of a worktree back to a bare cwd (see detectWorktreeName's KNOWN
+  // LIMITATION comment on why that signal is deliberately NOT used to clear session.worktreeName).
+  worktreeSession?: { worktreeName?: string; worktreePath?: string } | null;
 }

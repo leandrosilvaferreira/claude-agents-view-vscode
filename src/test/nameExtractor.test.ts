@@ -117,4 +117,35 @@ describe('extractRenamedTitle — auto-stamped worktree label', () => {
   it('accepts the custom-title unchanged when no worktree name is known yet', () => {
     expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'structured-logging' })).toBe('structured-logging');
   });
+
+  // Regression: Claude Code's auto-stamp for a NESTED worktree path (this project's own
+  // `.claude/worktrees/<type>/<slug>` convention) is observed to sometimes capture only the
+  // FIRST `/`-segment of the worktree name, not the full name — even when a worktree-state entry
+  // on the same transcript already recorded the full name. Real capture: session on branch
+  // `feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t`, worktree-state recorded the full
+  // `worktreeName:"feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t"`, yet the very next
+  // custom-title auto-stamp was just `"feat"`. The pre-existing full-string (mod `/`→`+`)
+  // comparison above missed this shape entirely, so the truncated stamp slipped through as a
+  // "real rename" and overwrote an already-correct, prompt-derived title.
+  it('rejects an auto-stamped custom-title that matches only the first segment of a nested known worktree name', () => {
+    expect(
+      extractRenamedTitle(
+        { type: 'custom-title', customTitle: 'feat' },
+        'feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t',
+      ),
+    ).toBeNull();
+  });
+
+  it('still accepts a custom-title matching neither the full nor the first-segment known worktree name', () => {
+    expect(
+      extractRenamedTitle(
+        { type: 'custom-title', customTitle: 'saque' },
+        'feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t',
+      ),
+    ).toBe('saque');
+  });
+
+  it('does not use the segment fallback when the known worktree name has no "/" (first segment would equal the whole name)', () => {
+    expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'feat' }, 'structured-logging')).toBe('feat');
+  });
 });

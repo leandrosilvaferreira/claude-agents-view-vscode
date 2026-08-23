@@ -61,29 +61,80 @@ export class ProjectPathResolver {
     }
   }
 
-  /** Tracks the bare git-worktree name from a `type:"worktree-state"` entry (real shape:
-   * `{"type":"worktree-state","worktreeSession":{"worktreeName":"structured-logging",...}}`) so
-   * logParser.ts's detectSessionTitle can recognize Claude Code's own later auto-stamped
-   * `custom-title` (set to this same name) instead of trusting it as a real user rename. See
-   * nameExtractor.ts's extractRenamedTitle.
+  /** Tracks the git-worktree name Claude Code will later echo into an auto-stamped
+   * `custom-title`, so logParser.ts's detectSessionTitle can recognize that echo (via
+   * nameExtractor.ts's extractRenamedTitle) instead of trusting it as a real user rename.
    *
-   * KNOWN LIMITATION, deliberately not "fixed": this never clears, so session.worktreeName
-   * latches to the LAST worktree entered for the rest of the session's life — a later GENUINE
-   * user rename that happens to coincide with a past worktree's name would be wrongly rejected as
-   * an auto-stamp echo. A clearing rule keyed on "relocated back to a bare, non-worktree cwd" was
-   * tried and reverted: real evidence (session `7ac34ece-fdce-41ad-9898-886d832035ec`) shows
-   * Claude Code can relocate a session OUT of a worktree to a bare cwd and then back — a worktree-state
-   * entry with `worktreeSession: null` in between — while STILL re-stamping the identical
-   * customTitle auto-echo afterward. Clearing on that "exit" signal made the SECOND, still-bogus
-   * auto-stamp get wrongly ACCEPTED as a real rename instead — reopening a worse form of the very
-   * bug this function exists to prevent. No reliable "permanently left this worktree" signal was
-   * found in the real corpus, so per this project's own architecture-no-public-transcript-schema
-   * lesson (don't speculatively engineer for a case real data doesn't confirm), the one-way latch
-   * stays as the deliberately-narrower, safer default. */
+   * Prefers a PATH-derived name (this method's own deriveWorktreeNameFromCwd, applied to
+   * `worktreeSession.worktreePath` when an explicit `type:"worktree-state"` entry is present,
+   * else to the current line's own `cwd`) over the entry's bare `worktreeSession.worktreeName`
+   * field. Real capture (session `9a282de8-...`, worktree `.../swapo-app/.claude/worktrees/
+   * feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t`) shows why: for this NESTED
+   * `<type>/<slug>` layout, `worktreeName` held only the bare leaf slug
+   * ("787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t", no "feat/" prefix), while Claude Code's own
+   * `custom-title` auto-stamp on the SAME transcript was `"feat"` — drawn from the worktree's own
+   * PATH, not from that field, so a comparison against the bare `worktreeName` alone could never
+   * recognize it (see nameExtractor.ts's extractRenamedTitle for the first-segment-tolerant
+   * comparison this feeds). `worktreePath` carries the full nested shape the auto-stamp is
+   * actually drawn from, so it's preferred; the bare `worktreeName` field is kept only as a
+   * fallback for a `worktree-state` entry that carries no `worktreePath` at all.
+   *
+   * The path-derived branch runs unconditionally whenever `worktreeSession` is present (even
+   * `worktreeSession: null`, which the `typeof pathSource === 'string'` / `typeof
+   * json.worktreeSession?.worktreeName === 'string'` checks both silently no-op on) — it may
+   * overwrite an earlier guess, matching the existing "latches to the LAST worktree entered"
+   * semantic. The FALLBACK branch below (no `worktreeSession` on this line at all — the common
+   * case for a session that starts with `cwd` already inside a worktree, since Claude Code then
+   * never writes a `worktree-state` entry at all) is guarded on `session.worktreeName ===
+   * undefined` so it only ever sets a first guess, never re-derives on every subsequent line.
+   *
+   * KNOWN LIMITATION, deliberately not "fixed": once set (either branch), this never clears, so
+   * session.worktreeName latches to the LAST worktree entered for the rest of the session's life
+   * — a later GENUINE user rename that happens to coincide with a past worktree's name would be
+   * wrongly rejected as an auto-stamp echo. A clearing rule keyed on "relocated back to a bare,
+   * non-worktree cwd" was tried and reverted: real evidence (session
+   * `7ac34ece-fdce-41ad-9898-886d832035ec`) shows Claude Code can relocate a session OUT of a
+   * worktree to a bare cwd and then back — a worktree-state entry with `worktreeSession: null` in
+   * between — while STILL re-stamping the identical customTitle auto-echo afterward. Clearing on
+   * that "exit" signal made the SECOND, still-bogus auto-stamp get wrongly ACCEPTED as a real
+   * rename instead — reopening a worse form of the very bug this function exists to prevent. No
+   * reliable "permanently left this worktree" signal was found in the real corpus, so per this
+   * project's own architecture-no-public-transcript-schema lesson (don't speculatively engineer
+   * for a case real data doesn't confirm), the one-way latch stays as the deliberately-narrower,
+   * safer default. ponytail: deriveWorktreeNameFromCwd only matches a `.../worktrees/<name>/...`
+   * layout (this project's and Claude Code's own convention) — a layout with no `worktrees`
+   * segment falls back to the bare `worktreeName` field (explicit entry) or stays undefined
+   * (fallback branch). */
   public detectWorktreeName(json: LogEntry, session: Session): void {
-    if (typeof json.worktreeSession?.worktreeName === 'string') {
-      session.worktreeName = json.worktreeSession.worktreeName;
+    if (json.worktreeSession) {
+      const pathSource = json.worktreeSession.worktreePath;
+      const derived = typeof pathSource === 'string' ? this.deriveWorktreeNameFromCwd(pathSource) : undefined;
+      const name = derived ?? json.worktreeSession.worktreeName;
+      if (typeof name === 'string') {
+        session.worktreeName = name;
+      }
+      return;
     }
+    if (session.worktreeName === undefined && typeof json.cwd === 'string') {
+      const fallback = this.deriveWorktreeNameFromCwd(json.cwd);
+      if (fallback) {
+        session.worktreeName = fallback;
+      }
+    }
+  }
+
+  /** Full path remaining after a `worktrees` directory in `cwd` — POSIX split is correct even
+   * cross-platform here, since Claude Code's `cwd` is always POSIX-shaped (see this class's own
+   * header comment). `.../swapo-app/.claude/worktrees/feat/787-saque-...` ->
+   * `"feat/787-saque-..."`, matching the shape a real `worktree-state` entry's own
+   * `worktreeSession.worktreeName` carries. Undefined when `cwd` has no `worktrees` segment, or
+   * `worktrees` is its last segment (nothing follows it to name the worktree). */
+  private deriveWorktreeNameFromCwd(cwd: string): string | undefined {
+    const segments = cwd.split('/');
+    const idx = segments.lastIndexOf('worktrees');
+    if (idx === -1 || idx + 1 >= segments.length) return undefined;
+    const rest = segments.slice(idx + 1).join('/');
+    return rest || undefined;
   }
 
   /**

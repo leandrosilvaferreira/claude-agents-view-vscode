@@ -70,6 +70,19 @@ function isScaffold(text: string): boolean {
  * rename that normalizes identically to a past worktree name would also be (wrongly) rejected —
  * accepted here since sessionDedupe.getDedupeKey() already tolerates that exact class of
  * near-miss for its own, primary purpose.
+ *
+ * The match also accepts the auto-stamp equalling just the FIRST `/`-segment of a
+ * slash-containing knownWorktreeName, not only the full name: for a NESTED worktree path (this
+ * project's own `.claude/worktrees/<type>/<slug>` convention, e.g. `feat/787-saque-de-brl...`),
+ * Claude Code's own auto-stamp is observed to sometimes only capture that first segment
+ * (`customTitle:"feat"`) instead of the full name it captures in the single-segment case above.
+ * Real capture, session on branch `feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t`: a
+ * worktree-state entry recorded the full `worktreeName:"feat/787-saque-de-brl-via-pix-mvp-
+ * fluxo-3-fases-t"`, yet the very next custom-title auto-stamp was just `"feat"` — the full-string
+ * comparison above missed it, so the truncated stamp still slipped through as a "real rename",
+ * overwriting an already-correct prompt-derived title. Segment-tolerant, not prefix-tolerant
+ * (`"feat"` matches, `"feat/78"` would not): the truncation observed always lands exactly on a
+ * `/` boundary, never mid-segment.
  */
 export function extractRenamedTitle(
   json: { type?: string; customTitle?: string },
@@ -78,8 +91,19 @@ export function extractRenamedTitle(
   if (json.type !== 'custom-title' || typeof json.customTitle !== 'string') return null;
   const title = json.customTitle.trim();
   if (!title) return null;
-  if (knownWorktreeName && normalizeForKey(title) === normalizeForKey(knownWorktreeName)) return null;
+  if (knownWorktreeName && isKnownWorktreeAutoStamp(title, knownWorktreeName)) return null;
   return title;
+}
+
+/** Exported so logParser.ts's reconsiderAutoStampedTitle can retroactively re-check an
+ * already-latched title against a worktree name that only became known on a later line, using
+ * the exact same tolerance (full match or first-`/`-segment match) as the inline check above —
+ * duplicating this comparison there previously caused it to miss the segment-match case entirely. */
+export function isKnownWorktreeAutoStamp(title: string, knownWorktreeName: string): boolean {
+  const normalizedTitle = normalizeForKey(title);
+  if (normalizedTitle === normalizeForKey(knownWorktreeName)) return true;
+  const firstSegment = knownWorktreeName.split('/')[0];
+  return firstSegment !== knownWorktreeName && normalizedTitle === normalizeForKey(firstSegment);
 }
 
 export function extractSessionName(json: LogEntryForName): string | null {

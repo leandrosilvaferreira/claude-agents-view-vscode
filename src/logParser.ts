@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Session, SubAgent } from './types';
-import { extractRenamedTitle, extractSessionName } from './nameExtractor';
+import { extractRenamedTitle, extractSessionName, isKnownWorktreeAutoStamp } from './nameExtractor';
 import { ProjectPathResolver } from './projectPathResolver';
 import { detectSubagents } from './subagentDetector';
 import { enrichSubagentMetadata } from './subagentMetadata';
@@ -133,15 +133,11 @@ export class LogParser {
       }
       trackTurnSignals(json, session);
       trackApiErrorSignal(json, session);
-      if (typeof json.entrypoint === 'string') {
-        session.entrypoint = json.entrypoint;
-      }
-      if (typeof json.version === 'string') {
-        session.claudeVersion = json.version;
-      }
+      this.detectEntrypointAndVersion(json, session);
       this.parseTimestamp(json, session, stats);
       this.projectPaths.detectGitBranch(json, session);
       this.projectPaths.detectWorktreeName(json, session);
+      this.reconsiderAutoStampedTitle(session);
       this.projectPaths.detectProjectPath(json, session);
       this.detectSessionModel(json, session);
 
@@ -151,6 +147,47 @@ export class LogParser {
     } catch {
       // Ignore JSON parse errors
     }
+  }
+
+  /**
+   * Undo a wrongly-latched auto-stamp echo the moment `session.worktreeName` becomes known,
+   * because it can become known too LATE to help on the line that needed it.
+   * detectSessionTitle's `titleIsCustom` latch is a one-way, immediate decision made while
+   * processing a single line — normally correct, since a `worktree-state` entry (or, via
+   * projectPathResolver.ts's cwd fallback, any earlier `cwd`-bearing line) precedes the
+   * matching custom-title auto-stamp and lets extractRenamedTitle reject it on the spot. But
+   * Claude Code can write that FIRST auto-stamp as literally the session's opening line, before
+   * any cwd or gitBranch has appeared anywhere in the transcript yet (real capture: session
+   * `9b771635-75d5-4d77-b7b2-afc77c38f25a`, line 0 is `{"type":"custom-title",
+   * "customTitle":"feat"}`, three lines before the first `cwd`) — so worktreeName was still
+   * undefined when that line's own detectSessionTitle call ran, extractRenamedTitle had nothing
+   * to reject it with, and titleIsCustom latched permanently on Claude Code's own label instead
+   * of a real rename. Runs on every line, right after detectWorktreeName, so the instant
+   * worktreeName becomes known (fallback or explicit) it can retroactively clear a latch that
+   * matches it. Cheap no-op in the overwhelmingly common case (titleIsCustom false, or a genuine
+   * rename that doesn't match the worktree name).
+   *
+   * Same accepted tradeoff as extractRenamedTitle's own doc comment: a genuine user rename that
+   * coincidentally equals the worktree name gets undone here too — sessionDedupe.getDedupeKey()
+   * already tolerates that class of near-miss for its own purpose, so this doesn't introduce a
+   * new risk, only a retroactive version of an already-accepted one.
+   *
+   * Reuses nameExtractor's isKnownWorktreeAutoStamp rather than a bespoke comparison here: an
+   * earlier version hand-rolled a plain normalizeForKey equality check, which missed the
+   * first-`/`-segment match case that extractRenamedTitle itself already handles (a truncated
+   * auto-stamp like "feat" against a full known name like "feat/787-saque-...") — silently
+   * failing to undo the exact latch this function exists to catch.
+   */
+  private reconsiderAutoStampedTitle(session: Session): void {
+    if (!session.titleIsCustom || session.worktreeName === undefined || session.sessionTitle === undefined) {
+      return;
+    }
+    if (!isKnownWorktreeAutoStamp(session.sessionTitle, session.worktreeName)) {
+      return;
+    }
+    session.titleIsCustom = false;
+    session.nameFromPrompt = false;
+    session.sessionTitle = undefined;
   }
 
   private detectSessionTitle(json: LogEntry, session: Session): void {
@@ -210,6 +247,17 @@ export class LogParser {
     // Assistant turns carry the main-loop model (e.g. "claude-sonnet-5"). Keep the latest.
     if (json.type === 'assistant' && json.message?.model) {
       session.model = json.message.model;
+    }
+  }
+
+  // Extracted out of parseLogLine purely to stay under this file's ESLint max-statements budget —
+  // both fields are simple, independent "keep the latest value seen" trackers with no shared logic.
+  private detectEntrypointAndVersion(json: LogEntry, session: Session): void {
+    if (typeof json.entrypoint === 'string') {
+      session.entrypoint = json.entrypoint;
+    }
+    if (typeof json.version === 'string') {
+      session.claudeVersion = json.version;
     }
   }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as path from 'path';
 import { ProjectPathResolver } from '../projectPathResolver';
+import { extractRenamedTitle } from '../nameExtractor';
 import { Session } from '../types';
 
 // Full-module mock (not vi.spyOn): Node's fs ESM namespace exports aren't configurable here, so
@@ -77,5 +78,131 @@ describe('ProjectPathResolver.knownProjectDirs (worktree history)', () => {
     resolver.detectProjectPath({}, session);
 
     expect(session.knownProjectDirs).toBeUndefined();
+  });
+});
+
+describe('ProjectPathResolver.detectWorktreeName — cwd fallback', () => {
+  // Regression for a real bug: a session whose `cwd` starts already inside a worktree (no
+  // in-session relocate) never gets a `worktree-state` entry at all, so worktreeName stayed
+  // permanently undefined and extractRenamedTitle's carve-out could never reject Claude Code's
+  // own auto-stamped custom-title — it latched as a real rename and collapsed sessionDedupe's key
+  // across unrelated sibling sessions in the same worktree (see this method's own doc comment for
+  // the real capture that surfaced it: branch `feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t`,
+  // auto-stamp `"feat"`).
+  it('derives worktreeName from the full path remaining after "worktrees" in cwd', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName(
+      { cwd: '/Users/dev/swapo-app/.claude/worktrees/feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t' },
+      session,
+    );
+
+    expect(session.worktreeName).toBe('feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t');
+  });
+
+  it('closes the original bug end-to-end: the derived name makes extractRenamedTitle reject the matching auto-stamp', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName({ cwd: '/Users/dev/swapo-app/.claude/worktrees/feat/787-saque' }, session);
+
+    expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'feat' }, session.worktreeName)).toBeNull();
+  });
+
+  it('leaves worktreeName undefined when cwd has no "worktrees" path segment', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName({ cwd: '/Users/dev/swapo-app' }, session);
+
+    expect(session.worktreeName).toBeUndefined();
+  });
+
+  it('leaves worktreeName undefined when "worktrees" is the last cwd segment (nothing names the worktree)', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName({ cwd: '/Users/dev/swapo-app/.claude/worktrees' }, session);
+
+    expect(session.worktreeName).toBeUndefined();
+  });
+
+  it('never overrides an explicit worktree-state entry with the cwd-derived guess', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName(
+      { worktreeSession: { worktreeName: 'feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t' } },
+      session,
+    );
+    resolver.detectWorktreeName({ cwd: '/Users/dev/swapo-app/.claude/worktrees/feat/787-saque' }, session);
+
+    expect(session.worktreeName).toBe('feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t');
+  });
+
+  it('lets a later explicit worktree-state entry override an earlier cwd-derived guess', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName({ cwd: '/Users/dev/swapo-app/.claude/worktrees/feat/787-saque' }, session);
+    resolver.detectWorktreeName(
+      { worktreeSession: { worktreeName: 'feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t' } },
+      session,
+    );
+
+    expect(session.worktreeName).toBe('feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t');
+  });
+
+  // Regression for a real bug: a `worktree-state` entry's bare `worktreeSession.worktreeName`
+  // field can hold only the leaf slug ("787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t"), not the
+  // full "<type>/<slug>" name — real capture, session `9a282de8-...`, worktreePath
+  // `.../worktrees/feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t`. Claude Code's own
+  // custom-title auto-stamp on that same transcript was `"feat"`, which the bare worktreeName
+  // field alone (no "feat/" prefix at all) could never recognize — so it slipped through as a
+  // "real rename" even though a worktree-state entry WAS present. worktreePath must win.
+  it('prefers the path-derived name over a bare worktreeSession.worktreeName leaf slug that omits the type prefix', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName(
+      {
+        worktreeSession: {
+          worktreeName: '787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t',
+          worktreePath: '/Users/dev/swapo-app/.claude/worktrees/feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t',
+        },
+      },
+      session,
+    );
+
+    expect(session.worktreeName).toBe('feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t');
+    expect(extractRenamedTitle({ type: 'custom-title', customTitle: 'feat' }, session.worktreeName)).toBeNull();
+  });
+
+  it('falls back to the bare worktreeSession.worktreeName field when the entry carries no worktreePath', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName({ worktreeSession: { worktreeName: 'structured-logging' } }, session);
+
+    expect(session.worktreeName).toBe('structured-logging');
+  });
+
+  it('leaves worktreeName untouched on a worktree-state entry with worktreeSession: null (exit signal)', () => {
+    const resolver = new ProjectPathResolver();
+    const session = makeSession({ type: 'claude-code' });
+
+    resolver.detectWorktreeName(
+      {
+        worktreeSession: {
+          worktreeName: '787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t',
+          worktreePath: '/Users/dev/swapo-app/.claude/worktrees/feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t',
+        },
+      },
+      session,
+    );
+    resolver.detectWorktreeName({ worktreeSession: null }, session);
+
+    expect(session.worktreeName).toBe('feat/787-saque-de-brl-via-pix-mvp-fluxo-3-fases-t');
   });
 });
