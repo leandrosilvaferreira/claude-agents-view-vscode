@@ -359,6 +359,12 @@ describe('sessionAsSubagent', () => {
     expect(sub.name).toBe('Agent');
     expect(sub.task).toBe('agent-untitled');
   });
+
+  it('maps an errored background agent down to a stopped SubAgent, since SubAgent.status has no error state', () => {
+    const agent = makeSession({ id: 'agent', status: 'error' });
+    const sub = sessionAsSubagent(agent);
+    expect(sub.status).toBe('stopped');
+  });
 });
 
 describe('applyNestedAgentLiveness', () => {

@@ -31,7 +31,7 @@ export interface Session {
   knownProjectDirs?: string[];
   projectName: string; // Human-readable project folder name or user prompt
   gitBranch: string;
-  status: 'working' | 'stopped';
+  status: 'working' | 'stopped' | 'error';
   lastInteractionTime: number; // Unix timestamp in ms
   subagents: SubAgent[];
   logFilePath: string;
@@ -44,6 +44,7 @@ export interface Session {
   lastEntryType?: string; // `type` of the last transcript entry — 'user' means Claude still owes a reply
   lastEntryIsThinking?: boolean; // Last conversational turn was a thinking-only block — mid-turn, still working
   lastEntryIsInterruption?: boolean; // Last user turn was Claude Code's own interruption sentinel (Esc), not a real prompt — overrides the 'user' reading of lastEntryType above. Recomputed on every message-bearing turn like lastEntryType, so it self-clears the moment a genuine next turn lands.
+  lastEntryIsApiError?: boolean; // Latch: the session's last real signal was an API error — a `system:api_error` entry (which carries no `message` of its own) or an assistant turn carrying `apiError`/`isApiErrorMessage`. Feeds computeSessionStatus's 'error' status. Self-clears back to false the instant any other message-bearing turn follows (Claude Code auto-retries some errors), same latch-that-self-clears shape as lastEntryIsInterruption above — see logParser.ts's trackApiErrorSignal.
   entrypoint?: string; // How the session started: 'claude-vscode'/'cli' = human, 'sdk-*' = spawned agent
   claudeVersion?: string; // Claude Code version stamped on the transcript (`version` field), for compat checks
   worktreeName?: string; // Bare git-worktree name from the last `type:"worktree-state"` entry seen — lets

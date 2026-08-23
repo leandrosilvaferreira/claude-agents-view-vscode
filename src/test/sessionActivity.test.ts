@@ -118,6 +118,58 @@ describe('computeSessionStatus', () => {
 
     expect(computeSessionStatus(stale, open)).toBe('working');
   });
+
+  it('reports an error status for an idle-but-not-abandoned session whose last signal was an api error', () => {
+    // The core new case: distinguishes "finished cleanly" from "broke" for a session that sits
+    // in the ambiguous window between RECENT_WRITE and IDLE_CEILING.
+    const status = computeSessionStatus(session({ lastEntryIsApiError: true }), noOpenFiles);
+
+    expect(status).toBe('error');
+  });
+
+  it('stays working right after a write, even with the api-error flag set', () => {
+    // The RECENT_WRITE short-circuit must win over the error reading: an error immediately
+    // followed by an active retry should still read 'working', not 'error'.
+    const status = computeSessionStatus(
+      session({ lastEntryIsApiError: true, lastInteractionTime: Date.now() - 5_000 }),
+      noOpenFiles,
+    );
+
+    expect(status).toBe('working');
+  });
+
+  it('stays working while the log file is held open, even with the api-error flag set', () => {
+    const stale = session({ lastEntryIsApiError: true, lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES });
+    const open = new Set([stale.logFilePath]);
+
+    expect(computeSessionStatus(stale, open)).toBe('working');
+  });
+
+  it('falls back to stopped past the idle ceiling, even with the api-error flag set', () => {
+    // 'error' must not bypass IDLE_CEILING — an old, long-abandoned errored session reads
+    // 'stopped' like every other abandoned session, not a permanent alarm.
+    const stale = session({
+      lastEntryIsApiError: true,
+      lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES,
+    });
+
+    expect(computeSessionStatus(stale, noOpenFiles)).toBe('stopped');
+  });
+
+  it('lets a still-running subagent outrank a stale api-error reading on the parent', () => {
+    // Precedence choice: hasRunningAgents is real, concurrent, currently-happening work, so it
+    // outranks even a known error on the parent's own last turn — same precedent as the
+    // interruption carve-out above (subagent liveness already outranks that).
+    const status = computeSessionStatus(
+      session({
+        lastEntryIsApiError: true,
+        subagents: [{ id: 'toolu_1', name: 'explorer', task: 'map the codebase', status: 'working' }],
+      }),
+      noOpenFiles,
+    );
+
+    expect(status).toBe('working');
+  });
 });
 
 describe('getOpenLogFiles', () => {

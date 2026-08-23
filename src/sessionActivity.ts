@@ -25,6 +25,18 @@ import { logDebug } from './logger';
  * interrupted session read as 'working' for up to IDLE_CEILING after the user backed out of it.
  * The other two conditions are untouched: a still-thinking or still-running-subagent session
  * stays 'working' regardless of the interruption.
+ *
+ * A session whose last real signal was an API error (session.lastEntryIsApiError, set by
+ * logParser.ts's trackApiErrorSignal) gets a fourth, higher-priority reading: 'error' instead of
+ * the default 'stopped', so the sidebar can tell "finished cleanly" apart from "broke". Like the
+ * three conditions above, this only applies below IDLE_CEILING — an old, long-abandoned errored
+ * session still falls back to plain 'stopped' rather than showing a permanent alarm. It's ranked
+ * below hasRunningAgents (a live subagent is real, ongoing work regardless of what the parent's
+ * own last turn was — same precedent as the interruption carve-out above) but above
+ * awaitingReply/isThinking: those two are only recomputed on a message-bearing turn, and a
+ * `system:api_error` entry carries none, so both can still be stale-true from the turn that
+ * preceded the very call that then failed — a confirmed failure is a more truthful read than a
+ * guess left over from an older turn.
  */
 // Shared with subagentMetadata.ts's best-effort grandchild status (mtime of a child's
 // sidecar-sibling .jsonl) — one definition of "recent" for the whole codebase, exported so it
@@ -37,7 +49,7 @@ export const RECENT_WRITE = 60 * 1000;
 // signal for a DIFFERENT purpose. See subagentMetadata.ts's computeChildStatus.
 export const IDLE_CEILING = 30 * 60 * 1000;
 
-export function computeSessionStatus(session: Session, openFiles: Set<string>): 'working' | 'stopped' {
+export function computeSessionStatus(session: Session, openFiles: Set<string>): 'working' | 'stopped' | 'error' {
   if (openFiles.has(path.normalize(session.logFilePath))) {
     return 'working';
   }
@@ -48,10 +60,16 @@ export function computeSessionStatus(session: Session, openFiles: Set<string>): 
   if (idle >= IDLE_CEILING) {
     return 'stopped';
   }
+  const hasRunningAgents = session.subagents.some((sub) => sub.status === 'working');
+  if (hasRunningAgents) {
+    return 'working';
+  }
+  if (session.lastEntryIsApiError === true) {
+    return 'error';
+  }
   const awaitingReply = session.lastEntryType === 'user' && !session.lastEntryIsInterruption;
   const isThinking = session.lastEntryIsThinking === true;
-  const hasRunningAgents = session.subagents.some((sub) => sub.status === 'working');
-  return awaitingReply || isThinking || hasRunningAgents ? 'working' : 'stopped';
+  return awaitingReply || isThinking ? 'working' : 'stopped';
 }
 
 /** Set of transcript files currently held open, per `lsof`. Scoped to ~/.claude and ~/.gemini to

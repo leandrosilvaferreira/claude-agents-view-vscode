@@ -23,6 +23,12 @@ export interface LogEntry {
         }>
       | string;
   };
+  // On an `assistant` turn that DID produce a `message`, these two mark the turn itself as an
+  // API-error response rather than a normal reply (rare in the observed corpus: ~2/661747 and
+  // ~141/661747 samples respectively) — distinct from the dedicated `system:api_error` entry
+  // (see `subtype` below), which never carries `message` at all.
+  apiError?: string;
+  isApiErrorMessage?: boolean;
   // Present on a tool_result entry. For a backgrounded Agent it carries status 'async_launched'.
   toolUseResult?: { status?: string; isAsync?: boolean; agentId?: string; resolvedModel?: string };
   // `queued_command` attachments carry a backgrounded agent's completion notification in `prompt`.
@@ -39,6 +45,11 @@ export interface LogEntry {
     Arguments?: { Task?: string; TaskName?: string; Cwd?: string };
   }>;
   type?: string;
+  // Distinguishes a `type:"system"` entry's specific kind — e.g. `subtype: "api_error"` marks a
+  // failed API call, `"compact_boundary"` a context-compaction marker. Only meaningful alongside
+  // `type: "system"`; read unconditionally in parseLogLine rather than trackTurnSignals, since
+  // these entries carry no `message` of their own.
+  subtype?: string;
   name?: string;
   id?: string;
   isSidechain?: boolean;

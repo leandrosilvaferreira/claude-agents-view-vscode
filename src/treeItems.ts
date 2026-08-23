@@ -75,6 +75,11 @@ export class SessionTreeItem extends vscode.TreeItem {
     if (status === 'working') {
       return new vscode.ThemeIcon('sync~spin', new vscode.ThemeColor('testing.iconPassed'));
     }
+    if (status === 'error') {
+      // Same testing.icon* family already used for 'working' above (pass/fail semantics fit an
+      // API-error read directly), so the two stay visually paired while still reading as opposite.
+      return new vscode.ThemeIcon('error', new vscode.ThemeColor('testing.iconFailed'));
+    }
     const idle = new vscode.ThemeColor('descriptionForeground');
     return new vscode.ThemeIcon(isAgentSession ? 'hubot' : 'circle-filled', idle);
   }

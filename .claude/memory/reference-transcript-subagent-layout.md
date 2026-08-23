@@ -64,22 +64,27 @@ tier (plausible when two files land in the same mtime tick) falls back to compar
 `logFilePath` itself, since `isMoreRelevant`'s own final `id` tiebreak is a no-op
 here (`existing.id` always equals `candidate.id` — both equal the map key).
 
-**CURRENTLY FAILING (found 2026-08-21, real-log audit widened to 14 days):**
-`sidecarReader.candidateMetadataDirs` computes candidate dirs from
-`session.projectPath` **as of the current parse only** — it keeps no memory of a
-worktree dir the session visited earlier, even though its own doc comment already
-notes `projectPath` "can flip over a session's lifetime." Of 34 worktree-split
-sessions in the audited corpus, 27 ended with `projectPath` back at the base cwd;
-for those, any sidecar that exists ONLY under the worktree-encoded dir becomes
-permanently unreachable (`readAllSidecars` → `[]`), so those subagents never get
-`agentId` (blocks grandchild attachment) and never get real name/model — they
-degrade to whatever was already rendered, never erased, just frozen. Not yet fixed.
-Companion timing gap: [[architecture-enrichment-runs-only-on-parse-not-tick]].
+**FIXED (found 2026-08-21, real-log audit widened to 14 days; fixed same day,
+commit 2627502, PR #1 "close 3 subagent-visibility gaps"):**
+`sidecarReader.candidateMetadataDirs` used to compute candidate dirs from
+`session.projectPath` **as of the current parse only** — no memory of a worktree
+dir the session visited earlier, even though its own doc comment already noted
+`projectPath` "can flip over a session's lifetime." Of 34 worktree-split sessions
+in the audited corpus, 27 ended with `projectPath` back at the base cwd; for
+those, any sidecar that existed ONLY under the worktree-encoded dir became
+permanently unreachable (`readAllSidecars` → `[]`), so those subagents never got
+`agentId` (blocked grandchild attachment) and never got real name/model. Fixed via
+`Session.knownProjectDirs` (`types.ts`) — an ordered/deduped, most-recently-used
+history of every encoded project directory `projectPath` has ever resolved to,
+appended in `projectPathResolver.ts`'s `setProjectPath`; `candidateMetadataDirs`
+now searches all of them, base dir first. Companion timing gap:
+[[architecture-enrichment-runs-only-on-parse-not-tick]].
 
 **How to apply:** before changing scanning or nesting, check this layout against a
 real install rather than the code's assumption. Relevant to `sessionScanner`,
 `sessionAssembly` and `sessionDedupe.findParentSession`. Any new code path that
 writes a session into an id-keyed map must go through `upsertIfMoreRelevant`, or the
-stub-collision bug reopens. A fix for the worktree-dir-loss bug above must accumulate
-every `projectPath` a session has ever encoded to, not just the latest one. See
-[[architecture-transcript-bookkeeping-entries]].
+stub-collision bug reopens. The worktree-dir-loss fix above accumulates every
+`projectPath` a session has ever encoded to (`knownProjectDirs`) rather than just the
+latest one — never regress `setProjectPath` to a single-value assignment, or this bug
+reopens too. See [[architecture-transcript-bookkeeping-entries]].

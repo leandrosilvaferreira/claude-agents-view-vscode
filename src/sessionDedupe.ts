@@ -68,7 +68,11 @@ export function sessionAsSubagent(agent: Session): SubAgent {
     id: agent.id,
     name: 'Agent',
     task: agent.sessionTitle || agent.id,
-    status: agent.status,
+    // SubAgent.status has no 'error' state of its own (out of scope — see types.ts); a background
+    // agent that errored is, for this row's purposes, simply no longer 'working', same as this
+    // file's own findParentSession above treats anything but 'working' as the one boundary that
+    // matters.
+    status: agent.status === 'working' ? 'working' : 'stopped',
     model: agent.model,
   };
 }

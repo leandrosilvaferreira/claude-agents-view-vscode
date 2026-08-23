@@ -42,17 +42,8 @@
       "mcp__obsidian",
       "mcp__context7"
     ],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./**/.env)",
-      "Read(./**/.env.*)",
-      "Read(./secrets/**)"
-    ],
-    "additionalDirectories": [
-      "/tmp",
-      "/private/tmp"
-    ]
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)", "Read(./secrets/**)"],
+    "additionalDirectories": ["/tmp", "/private/tmp"]
   },
   "worktree": {
     "baseRef": "head"
@@ -91,17 +82,13 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-main-branch.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-main-branch.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/rtk-hook.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/rtk-hook.mjs"],
             "timeout": 15
           }
         ]
@@ -112,9 +99,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-model-guard.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent-model-guard.mjs"],
             "timeout": 10
           }
         ]
@@ -125,25 +110,25 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/secret-scan.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/secret-scan.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-write-guard.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-write-guard.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-build-artifacts.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-build-artifacts.mjs"],
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/schema-drift-orient.mjs"],
             "timeout": 10
           }
         ]
@@ -154,9 +139,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-orient.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-orient.mjs"],
             "timeout": 10
           }
         ]
@@ -167,9 +150,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/vault-guard.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/vault-guard.mjs"],
             "timeout": 10
           }
         ]
@@ -182,41 +163,31 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/format-on-edit.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/format-on-edit.mjs"],
             "timeout": 60
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/set-files-changed.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/set-files-changed.mjs"],
             "timeout": 30
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/sql-idempotent-review.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/sql-idempotent-review.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/validate-settings-schema.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/validate-settings-schema.mjs"],
             "timeout": 30
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/large-file-warning.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/large-file-warning.mjs"],
             "timeout": 30
           }
         ]
@@ -227,9 +198,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-create.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-create.mjs"],
             "timeout": 60
           }
         ]
@@ -241,25 +210,19 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/check-deps-on-start.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/check-deps-on-start.mjs"],
             "timeout": 30
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-session-ctx.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-session-ctx.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/compile.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/compile.mjs"],
             "timeout": 10
           }
         ]
@@ -271,25 +234,19 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-prompt-ctx.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-prompt-ctx.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/vault-orient.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/vault-orient.mjs"],
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/orchestration-mode.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/orchestration-mode.mjs"],
             "timeout": 10
           }
         ]
@@ -301,9 +258,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-subagent-ctx.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-subagent-ctx.mjs"],
             "timeout": 10
           }
         ]
@@ -315,33 +270,25 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/verify-on-stop.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/verify-on-stop.mjs"],
             "timeout": 300
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/memory-stop.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/memory-stop.mjs"],
             "timeout": 30
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/sql-idempotent-review.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/sql-idempotent-review.mjs"],
             "timeout": 15
           },
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/large-file-warning.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/large-file-warning.mjs"],
             "timeout": 30
           }
         ]
@@ -353,9 +300,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-create.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-create.mjs"],
             "timeout": 30
           }
         ]
@@ -367,9 +312,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-remove.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree-remove.mjs"],
             "timeout": 15
           }
         ]
@@ -381,9 +324,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-log.mjs"
-            ],
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session-log.mjs"],
             "timeout": 10
           }
         ]
