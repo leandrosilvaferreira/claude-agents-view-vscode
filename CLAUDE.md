@@ -144,6 +144,11 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `<forked-skill-launch>` on a `type:"system"` entry (`context: fork` skills like
   `/code-review`), and in-process teammates (grandchildren — deliberately not detected).
   See `.claude/memory/architecture-subagent-dispatch-mechanisms.md`.
+- **subagentCompletion.ts** — the completion half of `subagentDetector` (split out for the
+  350-line budget): the launch/resume ACKs that must NOT read as completions
+  (`async_launched`, `teammate_spawned`, SendMessage's `resumedAgentId`) plus the three real
+  completion shapes — synchronous `tool_result`, `<task-notification>`, and an in-process
+  teammate's `<teammate-message>` `idle_notification`.
 - **sidecarReader.ts** — reads the `agent-<id>.meta.json` sidecars from both candidate
   directories (the transcript's own and the one `projectPath` encodes to — they differ
   inside a worktree), dedupes across them, and caches by filename set so a refresh that
@@ -177,7 +182,7 @@ subagents → dedupe/nest → render tree. All source under `src/`:
 - **Parsing/scanning never throws** — wrap every `fs`/`JSON.parse` in try/catch that
   logs via `logDebug` and returns an empty/fallback value; a bad log line must never
   break the tree.
-- **Keep `vscode` out of the parsing core** — `logParser`, `subagentDetector`,
+- **Keep `vscode` out of the parsing core** — `logParser`, `subagentDetector`, `subagentCompletion`,
   `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`, `sessionActivity`
   import no `vscode` and are
   unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,

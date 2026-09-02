@@ -10,7 +10,7 @@
 
 - [Green fixtures prove nothing here](architecture-fixtures-hide-real-log-shapes.md) — 153 tests + 2 reviews passed a parser bug that one run against real transcripts caught; validate against `~/.claude/projects/**`.
 
-- [Three subagent dispatch mechanisms](architecture-subagent-dispatch-mechanisms.md) — classic `Agent` tool_use vs `<forked-skill-launch>` (no tool_use, `<task-id>` completion) vs in-process teammates (invisible: grandchildren).
+- [Three subagent dispatch mechanisms](architecture-subagent-dispatch-mechanisms.md) — classic `Agent` tool_use vs `<forked-skill-launch>` (`<task-id>` completion) vs in-process teammates (`teammate_spawned` ACK, `<teammate-message>` idle_notification).
 
 - [Subagent transcript layout on disk](reference-transcript-subagent-layout.md) — subagents live in `<session-id>/subagents/agent-*.jsonl`; `scanClaudeSubSessions` looks in a `sessions/` dir that never exists; native worktree-entry leaves a same-id stub that can collide (fixed via `upsertIfMoreRelevant`); worktree-dir sidecar loss after cwd reverts to base — fixed on `fix/subagent-visibility-gaps`.
 

@@ -336,3 +336,103 @@ describe('detectSubagents — forked skill launch (context: fork)', () => {
     expect(subagents.get('toolu_resume_1')?.status).toBe('stopped');
   });
 });
+
+/**
+ * In-process teammates (Claude Code 2.1.258, captured from a live Fable 5.1 CLI session on the
+ * swapo-app project). The launch is a normal `Agent` tool_use, but the ACK carries
+ * `status: 'teammate_spawned'` instead of 'async_launched', and the teammate never emits a
+ * <task-notification> — it reports back as a `<teammate-message>` user turn carrying an
+ * `idle_notification`. Shapes below are copied from that transcript.
+ */
+describe('detectSubagents — in-process teammates', () => {
+  function teammateLaunch(id: string, name: string): LogEntry {
+    return {
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'tool_use', id, name: 'Agent', input: { name, description: 'Delegate task', model: 'sonnet' } },
+        ],
+      },
+    };
+  }
+
+  function teammateSpawnAck(id: string): LogEntry {
+    return {
+      type: 'user',
+      message: { content: [{ type: 'tool_result', tool_use_id: id }] },
+      toolUseResult: { status: 'teammate_spawned' },
+    };
+  }
+
+  function teammateMessage(name: string, type: string): LogEntry {
+    return {
+      type: 'user',
+      message: {
+        content:
+          `Another Claude session sent a message:\n<teammate-message teammate_id="${name}" color="blue">\n` +
+          `{"type":"${type}","from":"${name}","timestamp":"2026-09-02T03:50:22.101Z","idleReason":"available","result":"done"}\n</teammate-message>`,
+      },
+    };
+  }
+
+  it('keeps a teammate working after its teammate_spawned launch ACK', () => {
+    const subagents = new Map<string, SubAgent>();
+
+    detectSubagents(teammateLaunch('toolu_tm_1', 'fb-tests'), subagents);
+    detectSubagents(teammateSpawnAck('toolu_tm_1'), subagents);
+
+    expect(subagents.get('toolu_tm_1')?.status).toBe('working');
+  });
+
+  it('marks a teammate stopped on its idle_notification, matched by name', () => {
+    const subagents = new Map<string, SubAgent>();
+    detectSubagents(teammateLaunch('toolu_tm_1', 'fb-inventory'), subagents);
+    detectSubagents(teammateSpawnAck('toolu_tm_1'), subagents);
+
+    detectSubagents(teammateMessage('fb-inventory', 'idle_notification'), subagents);
+
+    expect(subagents.get('toolu_tm_1')?.status).toBe('stopped');
+  });
+
+  it('ignores a non-idle teammate message and leaves the teammate working', () => {
+    const subagents = new Map<string, SubAgent>();
+    detectSubagents(teammateLaunch('toolu_tm_1', 'fb-review'), subagents);
+    detectSubagents(teammateSpawnAck('toolu_tm_1'), subagents);
+
+    detectSubagents(teammateMessage('fb-review', 'progress_update'), subagents);
+
+    expect(subagents.get('toolu_tm_1')?.status).toBe('working');
+  });
+
+  it('stops only the teammate named in the notification', () => {
+    const subagents = new Map<string, SubAgent>();
+    detectSubagents(teammateLaunch('toolu_tm_1', 'fb-tests'), subagents);
+    detectSubagents(teammateSpawnAck('toolu_tm_1'), subagents);
+    detectSubagents(teammateLaunch('toolu_tm_2', 'fb-sec'), subagents);
+    detectSubagents(teammateSpawnAck('toolu_tm_2'), subagents);
+
+    detectSubagents(teammateMessage('fb-sec', 'idle_notification'), subagents);
+
+    expect(subagents.get('toolu_tm_1')?.status).toBe('working');
+    expect(subagents.get('toolu_tm_2')?.status).toBe('stopped');
+  });
+
+  it('ignores the last-prompt bookkeeping echo of an idle_notification', () => {
+    // A `last-prompt` entry re-states the text under `lastPrompt`, which getEntryText does not
+    // read. Reading it would re-stop a teammate a SendMessage had just resumed.
+    const subagents = new Map<string, SubAgent>();
+    detectSubagents(teammateLaunch('toolu_tm_1', 'fb-inventory'), subagents);
+    detectSubagents(teammateSpawnAck('toolu_tm_1'), subagents);
+
+    detectSubagents(
+      {
+        type: 'last-prompt',
+        lastPrompt:
+          'Another Claude session sent a message: <teammate-message teammate_id="fb-inventory" color="blue"> {"type":"idle_notification"',
+      } as LogEntry,
+      subagents,
+    );
+
+    expect(subagents.get('toolu_tm_1')?.status).toBe('working');
+  });
+});

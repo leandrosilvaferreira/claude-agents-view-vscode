@@ -14,8 +14,15 @@ do NOT share a launch shape:
    all**. Launch is a `type:"system"`, `subtype:"local_command"` entry whose top-level
    `content` embeds `<forked-skill-launch>{"agentId","skillName","description"}</…>`.
    Completion carries only `<task-id>` (the agentId); `<tool-use-id>` is absent.
-3. **In-process teammate** (agent teams) — a real `Agent` tool_use, but inside the _forked
-   agent's own_ transcript, so the parent transcript never sees it. Sidecar has
+3. **In-process teammate** (agent teams) — a real `Agent` tool_use. Since CLI **2.1.258**
+   (observed on a Fable 5.1 CLI session, 2026-09-02) the TOP-LEVEL session launches these
+   directly, so the parent transcript DOES see the `tool_use` — but its ACK carries
+   `toolUseResult.status:"teammate_spawned"` (not `"async_launched"`), and completion is a
+   plain user turn `<teammate-message teammate_id="NAME">{"type":"idle_notification",…}`,
+   never a `<task-notification>`. Missing both shapes marked every teammate stopped at
+   launch, so a session running three of them showed zero Working Agents and read
+   'stopped' itself. Older/nested launches still happen inside the _forked agent's own_
+   transcript, invisible to the parent. Sidecar (filename `agent-<name>-<hash>`) has
    `parentAgentId` + `taskKind:"in_process_teammate"`, no `toolUseId`, plus fields
    `subagentDetector.ts` never reads: `name`, `teamName`, `color`, `permissionMode`,
    `planModeRequired`, and `customAgentType` — the REAL specialist type (`agentType`
