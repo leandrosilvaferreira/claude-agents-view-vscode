@@ -4,8 +4,6 @@ See your local **Claude Code**, **OpenAI Codex** and **Google Antigravity** sess
 
 ![Agent Monitor sidebar showing Claude Code, Google Antigravity and Codex sessions with example projects and agent activity](resources/screenshot.png)
 
-*Illustrative screenshot with fictional project names and session text in English.*
-
 ## What you can see
 
 - **All three tools, clearly grouped** — separate Claude Code, Google Antigravity and Codex sections with their original brand icons, adapted for light and dark themes.
