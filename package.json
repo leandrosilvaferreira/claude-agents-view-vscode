@@ -2,7 +2,7 @@
   "name": "claude-agents-monitor",
   "displayName": "Agent Monitor: Claude Code, Google Antigravity & Codex",
   "description": "Monitor local Claude Code, OpenAI Codex and Google Antigravity sessions, agents and subagents in one VS Code sidebar.",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "publisher": "leandrosilvaferreira",
   "license": "Apache-2.0",
   "icon": "resources/icon.png",
