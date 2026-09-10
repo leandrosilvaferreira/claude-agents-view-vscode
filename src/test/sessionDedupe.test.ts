@@ -46,6 +46,18 @@ describe('normalizeForKey', () => {
 });
 
 describe('getDedupeKey', () => {
+  it('replaces a Codex fallback key when the completed metadata identifies the same rollout', () => {
+    const partial = makeSession({ type: 'codex', id: 'rollout-fallback' });
+    const sessions = new Map([[partial.id, partial]]);
+    partial.id = 'thread-id';
+    upsertIfMoreRelevant(sessions, partial.id, partial);
+    expect([...sessions.keys()]).toEqual(['thread-id']);
+  });
+  it('keeps separate Codex threads with identical project, branch and title', () => {
+    const a = makeSession({ type: 'codex', id: 'a', sessionTitle: 'implement OAuth' });
+    const b = makeSession({ type: 'codex', id: 'b', sessionTitle: 'implement OAuth' });
+    expect(getDedupeKey(a)).not.toBe(getDedupeKey(b));
+  });
   it('separates two concurrent sessions on the same project+branch by title', () => {
     const a = makeSession({ id: 'a', sessionTitle: 'enter the obsidian-mcp worktree' });
     const b = makeSession({ id: 'b', sessionTitle: 'review the dashboard PR' });

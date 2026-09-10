@@ -151,6 +151,19 @@ describe('scanSessionFiles', () => {
   });
 
   describe('combined output', () => {
+    it('discovers Codex rollouts under date directories without following symlinks or unrelated logs', () => {
+      const codexRoot = path.join(testRoot, 'codex', 'sessions');
+      const day = path.join(codexRoot, '2026', '09', '09');
+      fs.mkdirSync(day, { recursive: true });
+      const rollout = path.join(day, 'rollout-2026-09-09-thread.jsonl');
+      fs.writeFileSync(rollout, '');
+      fs.writeFileSync(path.join(day, 'history.jsonl'), '');
+      fs.symlinkSync(codexRoot, path.join(day, 'cycle'), 'dir');
+      expect(scanSessionFiles(claudeProjectsPath, geminiBrainPath, codexRoot)).toEqual([
+        { path: rollout, type: 'codex' },
+      ]);
+    });
+
     it('combines Claude Code and Antigravity results into a single array', () => {
       const claudeFile = writeClaudeRootFile('project-a', 'session.jsonl');
       const geminiFile = writeGeminiTranscript('conv-1');

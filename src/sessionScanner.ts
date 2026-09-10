@@ -1,18 +1,38 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { logDebug } from './logger';
+import { Session } from './types';
 
 export interface LogFileRef {
   path: string;
-  type: 'claude-code' | 'antigravity';
+  type: Session['type'];
 }
 
 /** Discover every Claude Code and Antigravity log file on disk. Never throws. */
-export function scanSessionFiles(claudeProjectsPath: string, geminiBrainPath: string): LogFileRef[] {
+export function scanSessionFiles(
+  claudeProjectsPath: string,
+  geminiBrainPath: string,
+  codexSessionsPath?: string,
+): LogFileRef[] {
   const files: LogFileRef[] = [];
   scanClaudeSessions(claudeProjectsPath, files);
   scanGeminiSessions(geminiBrainPath, files);
+  if (codexSessionsPath) scanCodexSessions(codexSessionsPath, files);
   return files;
+}
+
+function scanCodexSessions(directory: string, files: LogFileRef[]): void {
+  try {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const filePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) scanCodexSessions(filePath, files);
+      else if (entry.isFile() && entry.name.startsWith('rollout-') && entry.name.endsWith('.jsonl')) {
+        files.push({ path: filePath, type: 'codex' });
+      }
+    }
+  } catch {
+    // Missing roots and unreadable date directories do not block the other providers.
+  }
 }
 
 function scanClaudeSessions(claudeProjectsPath: string, files: LogFileRef[]): void {

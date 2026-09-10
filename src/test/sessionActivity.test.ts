@@ -31,6 +31,24 @@ function session(overrides: Partial<Session> = {}): Session {
 describe('computeSessionStatus', () => {
   const noOpenFiles = new Set<string>();
 
+  it.each(['stopped', 'error'] as const)(
+    'honors explicit Codex %s despite recent writes and an open file',
+    (codexTurnStatus) => {
+      const codex = session({ type: 'codex', codexTurnStatus, lastInteractionTime: Date.now() });
+      expect(computeSessionStatus(codex, new Set([codex.logFilePath]))).toBe(codexTurnStatus);
+    },
+  );
+
+  it('keeps Codex active during a quiet in-progress turn but expires abandoned turns', () => {
+    expect(computeSessionStatus(session({ type: 'codex', codexTurnStatus: 'working' }), noOpenFiles)).toBe('working');
+    expect(
+      computeSessionStatus(
+        session({ type: 'codex', codexTurnStatus: 'working', lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES }),
+        noOpenFiles,
+      ),
+    ).toBe('stopped');
+  });
+
   it('keeps a session working while its last turn is a thinking block', () => {
     // Claude Code streams reasoning as its own thinking-only entry, so the transcript can sit
     // untouched for minutes mid-reply. Without this the sidebar showed the session as stopped

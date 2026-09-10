@@ -8,6 +8,7 @@ import { detectSubagents } from './subagentDetector';
 import { enrichSubagentMetadata } from './subagentMetadata';
 import { LogEntry } from './transcriptEntry';
 import { trackTurnSignals, trackApiErrorSignal } from './turnSignals';
+import { CodexLogParser } from './codexLogParser';
 
 // Re-exported so existing importers (e.g. subagentDetector) keep resolving LogEntry from here.
 export type { LogEntry } from './transcriptEntry';
@@ -29,6 +30,7 @@ interface LogLineContext {
 const CLAUDE_CODE_BRAND = 'claude-code' as const;
 
 export class LogParser {
+  private codexParser = new CodexLogParser();
   private cache = new Map<string, { lastReadOffset: number; session: Session }>();
   private projectPaths = new ProjectPathResolver();
   private claudeProjectsPath: string;
@@ -37,7 +39,8 @@ export class LogParser {
     this.claudeProjectsPath = claudeProjectsPath ?? path.join(os.homedir(), '.claude', 'projects');
   }
 
-  public parse(filePath: string, type: 'claude-code' | 'antigravity'): Session {
+  public parse(filePath: string, type: Session['type']): Session {
+    if (type === 'codex') return this.codexParser.parse(filePath);
     try {
       let cacheEntry = this.cache.get(filePath);
 

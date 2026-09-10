@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Session, SubAgent } from './types';
 import { LogParser } from './logParser';
-import { scanSessionFiles } from './sessionScanner';
+import { LogFileRef, scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
 import { assembleVisibleSessions } from './sessionAssembly';
 import { upsertIfMoreRelevant } from './sessionDedupe';
@@ -14,6 +13,8 @@ import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible
 import { getNestedSubAgentChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
 import { splitSubagentsByStatus } from './subagentGrouping';
 import { refreshSessionStatuses } from './sessionStatusRefresh';
+import { assembleCodexHierarchy } from './codexHierarchy';
+import { createSessionFileWatchers } from './sessionFileWatchers';
 
 type TreeItemType = BrandTreeItem | MessageTreeItem | SessionTreeItem | SubAgentGroupTreeItem | SubAgentTreeItem;
 
@@ -48,6 +49,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   private homeDir = os.homedir();
   private claudeProjectsPath = path.join(this.homeDir, '.claude', 'projects');
   private geminiBrainPath = path.join(this.homeDir, '.gemini', 'antigravity-ide', 'brain');
+  private codexSessionsPath = path.join(process.env.CODEX_HOME || path.join(this.homeDir, '.codex'), 'sessions');
 
   public isMonitoringEnabled(): boolean {
     return this.monitoringEnabled;
@@ -72,6 +74,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     this.loading = false;
     this.isReady = true;
     this.setupFileWatchers();
+    this.setupCodexWatcher();
     this.startAutoRefresh();
     this._onDidChangeTreeData.fire();
   }
@@ -162,7 +165,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     // Still within the startup delay / first load — show an animated placeholder
     // instead of a blank view so it never looks broken.
     if (this.loading) {
-      return [new MessageTreeItem('Loading sessions…', 'loading~spin', 'Waiting for Claude Code to start')];
+      return [new MessageTreeItem('Loading sessions…', 'loading~spin', 'Reading local agent sessions')];
     }
 
     // Brand nodes (only shown when active sessions exist for that brand).
@@ -170,16 +173,22 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     const brands: BrandTreeItem[] = [];
     const claudeSessions = filteredSessions.filter((s) => s.type === CLAUDE_CODE_BRAND);
     const antigravitySessions = filteredSessions.filter((s) => s.type === 'antigravity');
+    const codexSessions = filteredSessions.filter((s) => s.type === 'codex');
     if (claudeSessions.length > 0) {
       brands.push(new BrandTreeItem(CLAUDE_CODE_BRAND, claudeSessions));
     }
     if (antigravitySessions.length > 0) {
       brands.push(new BrandTreeItem('antigravity', antigravitySessions));
     }
+    if (codexSessions.length > 0) brands.push(new BrandTreeItem('codex', codexSessions));
 
     if (brands.length === 0) {
       return [
-        new MessageTreeItem('No active sessions', 'inbox', 'No Claude Code or Antigravity sessions in the last hour'),
+        new MessageTreeItem(
+          'No active sessions',
+          'inbox',
+          'No Claude Code, Antigravity or Codex sessions in the last hour',
+        ),
       ];
     }
     return brands;
@@ -192,7 +201,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     const activeFolders = vscode.workspace.workspaceFolders;
     const activePaths = activeFolders ? activeFolders.map((f) => path.normalize(f.uri.fsPath).toLowerCase()) : [];
     const { topLevel, nestedAgents } = assembleVisibleSessions(
-      Array.from(this.sessions.values()),
+      assembleCodexHierarchy(Array.from(this.sessions.values())),
       activePaths,
       Date.now(),
     );
@@ -214,55 +223,38 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   private setupFileWatchers(): void {
     logDebug('SessionTreeDataProvider: setupFileWatchers() started');
     this.disposeWatchers();
+    this.watchers = createSessionFileWatchers(
+      { claudeProjectsPath: this.claudeProjectsPath, geminiBrainPath: this.geminiBrainPath },
+      (filePath, type) => {
+        this.handleFileChange(filePath, type);
+      },
+    );
+  }
 
-    // Watch Claude Code Sessions (watch both root and nested jsonl files)
+  private setupCodexWatcher(): void {
     try {
-      if (fs.existsSync(this.claudeProjectsPath)) {
-        logDebug(`SessionTreeDataProvider: Creating watcher for Claude sessions at: ${this.claudeProjectsPath}`);
-        const claudeWatcher = vscode.workspace.createFileSystemWatcher(
-          new vscode.RelativePattern(this.claudeProjectsPath, '**/*.jsonl'),
-        );
-        claudeWatcher.onDidChange((uri) => {
-          logDebug(`watcher: Claude file change detected: ${uri.fsPath}`);
-          this.handleFileChange(uri.fsPath, CLAUDE_CODE_BRAND);
-        });
-        claudeWatcher.onDidCreate((uri) => {
-          logDebug(`watcher: Claude file create detected: ${uri.fsPath}`);
-          this.handleFileChange(uri.fsPath, CLAUDE_CODE_BRAND);
-        });
-        this.watchers.push(claudeWatcher);
-      } else {
-        logDebug(`SessionTreeDataProvider: Claude projects path does not exist: ${this.claudeProjectsPath}`);
-      }
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(this.codexSessionsPath, '**/rollout-*.jsonl'),
+      );
+      watcher.onDidChange((uri) => {
+        this.handleFileChange(uri.fsPath, 'codex');
+      });
+      watcher.onDidCreate((uri) => {
+        this.handleFileChange(uri.fsPath, 'codex');
+      });
+      watcher.onDidDelete((uri) => {
+        for (const [id, session] of this.sessions) {
+          if (session.type === 'codex' && session.logFilePath === uri.fsPath) this.sessions.delete(id);
+        }
+        this._onDidChangeTreeData.fire();
+      });
+      this.watchers.push(watcher);
     } catch (err) {
-      logDebug(`SessionTreeDataProvider: Failed to setup Claude watcher: ${String(err)}`);
-    }
-
-    // Watch Antigravity Sessions
-    try {
-      if (fs.existsSync(this.geminiBrainPath)) {
-        logDebug(`SessionTreeDataProvider: Creating watcher for Antigravity sessions at: ${this.geminiBrainPath}`);
-        const geminiWatcher = vscode.workspace.createFileSystemWatcher(
-          new vscode.RelativePattern(this.geminiBrainPath, '**/transcript.jsonl'),
-        );
-        geminiWatcher.onDidChange((uri) => {
-          logDebug(`watcher: Antigravity file change detected: ${uri.fsPath}`);
-          this.handleFileChange(uri.fsPath, 'antigravity');
-        });
-        geminiWatcher.onDidCreate((uri) => {
-          logDebug(`watcher: Antigravity file create detected: ${uri.fsPath}`);
-          this.handleFileChange(uri.fsPath, 'antigravity');
-        });
-        this.watchers.push(geminiWatcher);
-      } else {
-        logDebug(`SessionTreeDataProvider: Gemini brain path does not exist: ${this.geminiBrainPath}`);
-      }
-    } catch (err) {
-      logDebug(`SessionTreeDataProvider: Failed to setup Antigravity watcher: ${String(err)}`);
+      logDebug(`SessionTreeDataProvider: Failed to setup Codex watcher: ${String(err)}`);
     }
   }
 
-  private handleFileChange(filePath: string, type: 'claude-code' | 'antigravity'): void {
+  private handleFileChange(filePath: string, type: Session['type']): void {
     if (!this.monitoringEnabled || !this.isReady) {
       logDebug(`SessionTreeDataProvider: handleFileChange() skipped for ${filePath}`);
       return;
@@ -284,7 +276,8 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
 
   public async loadSessions(): Promise<void> {
     logDebug('SessionTreeDataProvider: loadSessions() started');
-    const files = scanSessionFiles(this.claudeProjectsPath, this.geminiBrainPath);
+    const files = scanSessionFiles(this.claudeProjectsPath, this.geminiBrainPath, this.codexSessionsPath);
+    this.removeMissingCodexSessions(files);
     logDebug(`SessionTreeDataProvider: Scanned total ${files.length} log files`);
 
     // Parse all session files
@@ -306,6 +299,13 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     }
 
     this.checkClaudeVersionCompat();
+  }
+
+  private removeMissingCodexSessions(files: LogFileRef[]): void {
+    const paths = new Set(files.filter((file) => file.type === 'codex').map((file) => file.path));
+    for (const [id, session] of this.sessions) {
+      if (session.type === 'codex' && !paths.has(session.logFilePath)) this.sessions.delete(id);
+    }
   }
 
   // Warn once when a Claude Code newer than the validated version writes logs, so a format change

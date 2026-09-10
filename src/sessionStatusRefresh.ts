@@ -43,6 +43,7 @@ import { enrichSubagentMetadata } from './subagentMetadata';
 export function refreshSessionStatuses(sessions: Session[], openFiles: Set<string>): void {
   for (const session of sessions) {
     session.status = computeSessionStatus(session, openFiles);
+    if (session.type === 'codex') continue;
     enrichSubagentMetadata(session);
     refreshNestedSubagents(session);
   }

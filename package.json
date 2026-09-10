@@ -1,7 +1,7 @@
 {
   "name": "claude-agents-monitor",
-  "displayName": "Claude & Antigravity Agent Monitor",
-  "description": "Lightweight VS Code sidebar monitor for active Claude Code and Google Antigravity sessions and subagents.",
+  "displayName": "Agent Monitor: Claude Code, Google Antigravity & Codex",
+  "description": "Monitor local Claude Code, OpenAI Codex and Google Antigravity sessions, agents and subagents in one VS Code sidebar.",
   "version": "0.4.11",
   "publisher": "leandrosilvaferreira",
   "license": "Apache-2.0",
@@ -24,7 +24,11 @@
     "claude",
     "claude code",
     "antigravity",
+    "google antigravity",
+    "codex",
+    "openai",
     "agents",
+    "subagents",
     "monitor"
   ],
   "activationEvents": [],
@@ -107,13 +111,13 @@
       ]
     },
     "configuration": {
-      "title": "Claude & Antigravity Agent Monitor",
+      "title": "Agent Monitor: Claude Code, Google Antigravity & Codex",
       "properties": {
         "claudeAgentsMonitor.enabled": {
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "description": "Monitor Claude Code and Antigravity sessions. When disabled, the extension stops reading logs in every window/instance. Monitoring only resumes when you re-enable it (button at the top of the panel) or change this setting."
+          "description": "Monitor Claude Code, Codex and Antigravity sessions. When disabled, the extension stops reading logs in every window/instance. Monitoring only resumes when you re-enable it (button at the top of the panel) or change this setting."
         }
       }
     }

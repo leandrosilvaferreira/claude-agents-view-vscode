@@ -6,6 +6,9 @@ export interface SubAgent {
   model?: string; // LLM the subagent runs on (from the Agent tool's `model` input)
   launchId?: string; // Original launch tool_use id, preserved when a SendMessage resume re-keys `id` (subagentDetector.ts) so subagentMetadata's sidecar join keeps matching
   agentId?: string; // Raw agentId from the sidecar filename (agent-<id>.meta.json) — the other form SendMessage's `to` may target when launch set no `name` (subagentMetadata.ts)
+  logFilePath?: string; // Codex agents have their own rollout transcript.
+  lastInteractionTime?: number;
+  latestUpdate?: string;
   // "Grandchildren": subagents THIS subagent launched itself (joined on the sidecar's
   // parentAgentId — see subagentMetadata.ts's attachNestedSubagents). Deliberately one level
   // only — a depth-3 chain (a grandchild's own children) is truncated, not represented here.
@@ -35,7 +38,14 @@ export interface Session {
   lastInteractionTime: number; // Unix timestamp in ms
   subagents: SubAgent[];
   logFilePath: string;
-  type: 'claude-code' | 'antigravity';
+  type: 'claude-code' | 'antigravity' | 'codex';
+  codexParentThreadId?: string;
+  codexAgentName?: string;
+  codexAgentTask?: string;
+  codexAgentPath?: string;
+  codexSpawnedTasks?: Record<string, string>;
+  codexLatestUpdate?: string;
+  codexTurnStatus?: 'working' | 'stopped' | 'error';
   nameFromPrompt?: boolean; // Flag indicating if sessionTitle was captured
   sessionTitle?: string; // First user prompt (session name as shown in Claude/AG tab)
   titleIsCustom?: boolean; // sessionTitle came from a user rename — nothing generated may override it

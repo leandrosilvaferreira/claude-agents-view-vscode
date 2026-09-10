@@ -95,6 +95,7 @@ export function normalizeForKey(text: string): string {
  * windows open on the same repo) from colliding into a single slot. Sessions without a captured
  * title yet fall back to their own id, so two fresh title-less sessions don't merge either. */
 export function getDedupeKey(session: Session): string {
+  if (session.type === 'codex') return `codex|${session.id}`;
   const projectKey = path.normalize(session.projectPath).toLowerCase();
   const textKey = normalizeForKey(session.sessionTitle || session.id);
   return `${session.type}|${projectKey}|${session.gitBranch}|${textKey}`;
@@ -136,7 +137,16 @@ export function isMoreRelevant(a: Session, b: Session): boolean {
  *    stub and its real transcript are written within the same mtime tick). Broken by the one
  *    thing that still differs and is independent of scan order: the files' own paths.
  */
+function removeCodexFallbackKeys(map: Map<string, Session>, key: string, candidate: Session): void {
+  for (const [previousKey, previous] of map) {
+    if (previousKey !== key && previous.type === 'codex' && previous.logFilePath === candidate.logFilePath) {
+      map.delete(previousKey);
+    }
+  }
+}
+
 export function upsertIfMoreRelevant(map: Map<string, Session>, key: string, candidate: Session): void {
+  if (candidate.type === 'codex') removeCodexFallbackKeys(map, key, candidate);
   const existing = map.get(key);
   if (!existing || existing.logFilePath === candidate.logFilePath) {
     map.set(key, candidate);
