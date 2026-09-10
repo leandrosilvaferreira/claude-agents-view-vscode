@@ -26,6 +26,8 @@ On Windows, `~` refers to your user home directory. For a custom Codex location,
 
 The extension requires **VS Code 1.90 or later**, or a compatible editor such as Antigravity, and runs on macOS, Linux and Windows. At least one supported tool must have written local logs; the monitor does not start agents or create sessions.
 
+Last validated against **Claude Code 2.1.267** — see the [validation scope and results](docs/claude-code-2.1.267-validation.md).
+
 ## Privacy and limitations
 
 Monitoring reads existing logs locally without modifying them. It needs no cloud account, API key or access to Codex's credential files or state database. It does not decrypt protected content.
