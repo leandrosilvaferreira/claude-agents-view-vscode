@@ -26,17 +26,6 @@ On Windows, `~` refers to your user home directory. For a custom Codex location,
 
 The extension requires **VS Code 1.90 or later**, or a compatible editor such as Antigravity, and runs on macOS, Linux and Windows. At least one supported tool must have written local logs; the monitor does not start agents or create sessions.
 
-## Codex tasks and updates
-
-Codex may encrypt task text in its local logs. Recognized encrypted tokens are hidden instead of being presented as readable tasks.
-
-- When readable task text is available, the row shows a compact preview and the tooltip preserves its full text.
-- When the task cannot be read, the tooltip says **Task unavailable in local log**.
-- If the agent has a readable progress message, the row shows **Update:** and the tooltip labels it **Latest update**. This is the agent's own recorded message, not a recovered task or an invented summary.
-- Activity time comes from the agent's own log. A missing parent transcript leaves the agent visible as a standalone session.
-
-Codex completion, interruption and failure events take precedence over an open file or a recent write. An unfinished turn becomes inactive after 30 minutes without activity; a working descendant keeps its parent visible. The monitor also finds resumed sessions in older date directories. Archived and remote-only Codex sessions are outside this view.
-
 ## Privacy and limitations
 
 Monitoring reads existing logs locally without modifying them. It needs no cloud account, API key or access to Codex's credential files or state database. It does not decrypt protected content.
