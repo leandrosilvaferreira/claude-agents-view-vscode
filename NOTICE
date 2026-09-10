@@ -27,6 +27,27 @@ Removing or obscuring the attribution above is a violation of the License.
 --------------------------------------------------------------------------------
 THIRD-PARTY MATERIAL
 
+resources/codex-light.svg and resources/codex-dark.svg reproduce the OpenAI
+Blossom mark from OpenAI's Codex extension (openai.chatgpt 26.506.31421),
+resources/blossom-black.svg and resources/blossom-white.svg, unchanged.
+The OpenAI name and Blossom logo are trademarks of OpenAI. They identify the
+Codex integration; this extension is not affiliated with or endorsed by OpenAI.
+Brand guidance: https://openai.com/brand/
+
+resources/claude-light.svg and resources/claude-dark.svg reproduce the Claude
+asterisk mark from Anthropic's Claude Code extension (anthropic.claude-code
+2.1.140), resources/claude-logo.svg, without changing the shape or color.
+The Claude name and mark belong to Anthropic and identify this integration.
+
+resources/antigravity-light.svg and resources/antigravity-dark.svg reproduce
+the Antigravity mark from the installed Antigravity IDE application,
+out/media/jetski-logo-black.svg and jetski-logo-white.svg. Only matching viewBox
+attributes were added for sidebar scaling; original paths and colors remain.
+The Antigravity name and mark belong to Google and identify this integration.
+Official brand assets: https://www.antigravity.google/press
+
+This extension is not affiliated with or endorsed by Anthropic or Google.
+
 The published extension (the .vsix) contains no third-party code. The following
 applies to the development harness kept in this repository, which is not part of
 the distributed extension:
@@ -37,4 +58,3 @@ the distributed extension:
     Copyright (c) Affaan Mustafa
   Each affected file carries its own upstream attribution header. Those headers
   must be preserved; the MIT terms continue to govern that material.
-

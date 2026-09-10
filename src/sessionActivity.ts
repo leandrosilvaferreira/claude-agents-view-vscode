@@ -49,7 +49,13 @@ export const RECENT_WRITE = 60 * 1000;
 // signal for a DIFFERENT purpose. See subagentMetadata.ts's computeChildStatus.
 export const IDLE_CEILING = 30 * 60 * 1000;
 
+function computeCodexStatus(session: Session): Session['status'] {
+  if (session.codexTurnStatus !== 'working') return session.codexTurnStatus ?? 'stopped';
+  return Date.now() - session.lastInteractionTime < IDLE_CEILING ? 'working' : 'stopped';
+}
+
 export function computeSessionStatus(session: Session, openFiles: Set<string>): 'working' | 'stopped' | 'error' {
+  if (session.type === 'codex') return computeCodexStatus(session);
   if (openFiles.has(path.normalize(session.logFilePath))) {
     return 'working';
   }

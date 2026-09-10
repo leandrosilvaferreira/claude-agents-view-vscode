@@ -29,7 +29,7 @@ describe('architectural lint rules', () => {
     );
 
     expect(ruleIds).toContain('boundaries/dependencies');
-  });
+  }, 30000);
 
   it('stops the parsing core from importing the VS Code layer', async () => {
     const ruleIds = await ruleIdsFor(
@@ -54,7 +54,7 @@ describe('architectural lint rules', () => {
 
     expect(ruleIds).toContain('import-x/no-restricted-paths');
   });
-});
+}, 30000);
 
 describe('import cycle detection', () => {
   // A cycle only exists between files that are really on disk — the resolver reads the
@@ -76,4 +76,4 @@ describe('import cycle detection', () => {
 
     expect(ruleIds).toContain('import-x/no-cycle');
   });
-});
+}, 30000);

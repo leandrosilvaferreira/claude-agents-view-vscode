@@ -15,6 +15,14 @@ export interface AssembledSessions {
   nestedAgents: Map<string, SubAgent[]>;
 }
 
+function hasRecentDescendant(agents: SubAgent[], cutoff: number): boolean {
+  return agents.some(
+    (agent) =>
+      (agent.lastInteractionTime !== undefined && agent.lastInteractionTime >= cutoff) ||
+      hasRecentDescendant(agent.children ?? [], cutoff),
+  );
+}
+
 /**
  * Turn the raw parsed sessions into the set shown in the tree:
  *  1. drop subagent sidechains and sessions that aged out (concluded > 1h ago; running ones always stay),
@@ -30,8 +38,12 @@ export function assembleVisibleSessions(all: Session[], activePaths: string[], n
   const cutoff = now - 60 * 60 * 1000;
   const candidates = all.filter((session) => {
     if (session.isSidechain) return false;
-    if (session.status !== 'working' && session.lastInteractionTime < cutoff) return false;
-    if (session.type === 'antigravity') return true;
+    if (session.status !== 'working' && session.lastInteractionTime < cutoff) {
+      // Codex children are already nested; keep recent completions reachable without
+      // replacing the root's own activity timestamp with a descendant's timestamp.
+      if (session.type !== 'codex' || !hasRecentDescendant(session.subagents, cutoff)) return false;
+    }
+    if (session.type === 'antigravity' || session.type === 'codex') return true;
     if (activePaths.length === 0) return true;
     const proj = path.normalize(session.projectPath).toLowerCase();
     return activePaths.some((ap) => proj === ap || proj.startsWith(ap + path.sep));

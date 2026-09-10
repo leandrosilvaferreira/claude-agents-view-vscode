@@ -1,9 +1,23 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { Session, SubAgent } from './types';
+import { readableCodexText } from './codexTasks';
 
 /** Shorten model ids for display: "claude-sonnet-5" → "sonnet-5"; "sonnet" stays "sonnet". */
 function formatModel(model?: string): string {
   return model ? model.replace(/^claude-/, '') : '';
+}
+
+const BRAND_LABELS: Record<Session['type'], string> = {
+  'claude-code': 'Claude Code',
+  antigravity: 'Google Antigravity',
+  codex: 'Codex',
+};
+
+function codexTaskPreview(task?: string, latestUpdate?: string): string {
+  const compact = (task ?? latestUpdate ?? '').replace(/\s+/g, ' ').trim();
+  const preview = compact.length > 120 ? compact.slice(0, 117).trimEnd() + '...' : compact;
+  return !task && latestUpdate ? `Update: ${preview}` : preview;
 }
 
 /** Non-selectable placeholder row for loading / empty states. */
@@ -20,18 +34,18 @@ export class MessageTreeItem extends vscode.TreeItem {
 
 export class BrandTreeItem extends vscode.TreeItem {
   constructor(
-    public readonly brand: 'claude-code' | 'antigravity',
+    public readonly brand: Session['type'],
     public readonly sessions: Session[],
   ) {
-    super(brand === 'claude-code' ? 'Claude Code' : 'Google Antigravity', vscode.TreeItemCollapsibleState.Expanded);
+    super(BRAND_LABELS[brand], vscode.TreeItemCollapsibleState.Expanded);
     this.contextValue = 'brand';
     this.id = brand;
 
-    if (brand === 'claude-code') {
-      this.iconPath = new vscode.ThemeIcon('hubot', new vscode.ThemeColor('charts.red'));
-    } else {
-      this.iconPath = new vscode.ThemeIcon('run-all', new vscode.ThemeColor('charts.blue'));
-    }
+    const iconName = brand === 'claude-code' ? 'claude' : brand;
+    this.iconPath = {
+      light: vscode.Uri.file(path.join(__dirname, '..', 'resources', `${iconName}-light.svg`)),
+      dark: vscode.Uri.file(path.join(__dirname, '..', 'resources', `${iconName}-dark.svg`)),
+    };
   }
 }
 
@@ -61,7 +75,7 @@ export class SessionTreeItem extends vscode.TreeItem {
     this.tooltip = new vscode.MarkdownString(
       `**Project:** ${session.projectName}\n\n` +
         (session.sessionTitle ? `**Session:** ${session.sessionTitle}\n\n` : '') +
-        `**Type:** ${session.type === 'claude-code' ? 'Claude Code' : 'Google Antigravity'}\n\n` +
+        `**Type:** ${BRAND_LABELS[session.type]}\n\n` +
         (model ? `**Model:** \`${model}\`\n\n` : '') +
         `**Branch:** \`${session.gitBranch}\`\n\n` +
         `**Last Active:** ${new Date(session.lastInteractionTime).toLocaleString()}\n\n` +
@@ -146,11 +160,32 @@ export class SubAgentTreeItem extends vscode.TreeItem {
     const model = formatModel(subagent.model || parentSession.model);
     this.description = model ? `${model} · ${subagent.task}` : subagent.task;
     this.tooltip = `Subagent ${subagent.name}\nTask: ${subagent.task}${model ? `\nModel: ${model}` : ''}`;
+    if (parentSession.type === 'codex') this.setCodexDetails(model);
 
     if (subagent.status === 'working' && parentSession.status === 'working') {
       this.iconPath = new vscode.ThemeIcon('sync~spin', new vscode.ThemeColor('testing.iconPassed'));
     } else {
       this.iconPath = new vscode.ThemeIcon('check', new vscode.ThemeColor('descriptionForeground'));
     }
+  }
+
+  private setCodexDetails(model: string): void {
+    const sub = this.subagent;
+    const task = readableCodexText(sub.task);
+    const latestUpdate = readableCodexText(sub.latestUpdate);
+    const detail = codexTaskPreview(task, latestUpdate);
+    this.description = [model, detail].filter(Boolean).join(' · ');
+    this.tooltip = [
+      `Subagent ${sub.name}`,
+      task ? `Task: ${task}` : 'Task unavailable in local log',
+      latestUpdate ? `Latest update: ${latestUpdate}` : '',
+      `Status: ${sub.status}`,
+      model ? `Model: ${model}` : '',
+      `Thread: ${sub.id}`,
+      sub.lastInteractionTime ? `Last Active: ${new Date(sub.lastInteractionTime).toLocaleString()}` : '',
+      sub.logFilePath ? `Log Path: ${sub.logFilePath}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 }

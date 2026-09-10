@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'path';
 import { assembleVisibleSessions } from '../sessionAssembly';
+import { assembleCodexHierarchy } from '../codexHierarchy';
 import { Session } from '../types';
 
 const NOW = 1_000_000_000_000;
@@ -22,6 +23,35 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 }
 
 describe('assembleVisibleSessions', () => {
+  it.each([false, true])('retains a recent completed Codex descendant (grandchild: %s)', (grandchild) => {
+    const root = makeSession({
+      id: 'root',
+      type: 'codex',
+      status: 'stopped',
+      lastInteractionTime: NOW - 2 * 60 * 60 * 1000,
+    });
+    const child = makeSession({
+      id: 'child',
+      type: 'codex',
+      status: 'stopped',
+      codexParentThreadId: 'root',
+      lastInteractionTime: grandchild ? root.lastInteractionTime : NOW - 1000,
+    });
+    const leaf = makeSession({
+      id: 'leaf',
+      type: 'codex',
+      status: 'stopped',
+      codexParentThreadId: 'child',
+      lastInteractionTime: NOW - 1000,
+    });
+    const hierarchy = assembleCodexHierarchy(grandchild ? [root, child, leaf] : [root, child]);
+    const { topLevel } = assembleVisibleSessions(hierarchy, [], NOW);
+    expect(topLevel.map((session) => session.id)).toEqual(['root']);
+    expect(topLevel[0].lastInteractionTime).toBe(NOW - 2 * 60 * 60 * 1000);
+    expect(root.lastInteractionTime).toBe(NOW - 2 * 60 * 60 * 1000);
+    expect(assembleVisibleSessions(hierarchy, [], NOW + 60 * 60 * 1000).topLevel).toEqual([]);
+  });
+
   it('keeps two concurrent same-branch sessions with distinct titles (the "only one shows" fix)', () => {
     const a = makeSession({ id: 'a', gitBranch: 'feat/x', projectPath: '/repo/wt/x', sessionTitle: 'first task' });
     const b = makeSession({ id: 'b', gitBranch: 'feat/x', projectPath: '/repo/wt/x', sessionTitle: 'second task' });
