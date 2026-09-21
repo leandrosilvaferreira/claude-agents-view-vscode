@@ -28,6 +28,14 @@ export function findSubagentEntryByTarget(
 }
 
 export function detectCompletions(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+  // A launch ACK AND a synchronous subagent's own completion tool_result both carry
+  // toolUseResult.agentId (real corpus: 1,730/1,730 sync completions carry {status:'completed',
+  // agentId,...}, the same field the async ACK carries) — recorded unconditionally, before
+  // anything below can return early, so a same-chunk SendMessage{to:<agentId>} resume or
+  // <task-id>-only notification can still match it on a cold parse (see recordResultAgentId's own
+  // doc comment for why this can't wait for the sidecar join instead).
+  recordResultAgentId(json, currentSubagents);
+
   // A backgrounded Agent gets its tool_result ~100ms after launch, carrying
   // toolUseResult.status === 'async_launched'. That ACKs the launch — it does NOT mean the agent
   // finished (observed: an agent ACKed at 17:58:09 only really finished at 18:07:06). Counting it
@@ -40,16 +48,17 @@ export function detectCompletions(json: LogEntry, currentSubagents: Map<string, 
   // {success, message, resumedAgentId, pin}. Counting either ACK as a completion would flip the
   // subagent back to 'stopped' immediately, undoing the launch/resume it just ACKed. Both real
   // completions arrive later as the <task-notification> below, carrying the same id either way.
-  if (isLaunchOrResumeAck(json)) {
+  if (isLaunchOrSendMessageAck(json)) {
     return;
   }
 
   // Antigravity completions carry tool_call_id; standalone Claude tool_result carries tool_use_id.
+  const at = entryTime(json);
   if (json.type === 'TOOL_OUTPUT' && json.tool_call_id) {
-    markStopped(currentSubagents, json.tool_call_id);
+    markStopped(currentSubagents, json.tool_call_id, at);
   }
   if (json.tool_use_id) {
-    markStopped(currentSubagents, json.tool_use_id);
+    markStopped(currentSubagents, json.tool_use_id, at);
   }
   // Real Claude Code transcripts nest tool_result blocks inside message.content[] instead of
   // carrying tool_use_id at the top level — without this, subagents started via the nested
@@ -58,7 +67,7 @@ export function detectCompletions(json: LogEntry, currentSubagents: Map<string, 
   if (json.message && Array.isArray(json.message.content)) {
     for (const block of json.message.content) {
       if (block.type === 'tool_result' && block.tool_use_id) {
-        markStopped(currentSubagents, block.tool_use_id);
+        markStopped(currentSubagents, block.tool_use_id, at);
       }
     }
   }
@@ -93,12 +102,37 @@ function detectTeammateIdleCompletion(json: LogEntry, currentSubagents: Map<stri
   }
   const entry = findSubagentEntryByTarget(currentSubagents, match[1]);
   if (entry) {
-    entry[1].status = 'stopped';
+    stop(entry[1], entryTime(json));
   }
 }
 
-function isLaunchOrResumeAck(json: LogEntry): boolean {
-  return isAsyncLaunchAck(json) || isSendMessageResumeAck(json);
+/** A tool_result's `toolUseResult.agentId` names the agentId Claude Code assigned — not only on
+ * the async-launch ACK ({status:'async_launched', agentId, ...}, 2995/2995 real ACKs) but on a
+ * SYNCHRONOUS subagent's own completion tool_result too ({status:'completed', agentId, ...},
+ * 1,730/1,730 real sync completions). Called unconditionally for every entry (see
+ * detectCompletions), instead of waiting for subagentMetadata's sidecar join (which only runs
+ * after the whole parsed chunk), so a later same-chunk SendMessage{to:<agentId>} resume or
+ * <task-id>-only notification (a subagent re-woken after its first completion) can still resolve
+ * on a cold parse — e.g. at extension start. Only ever fills an UNSET `agentId`, so calling it
+ * unconditionally never overwrites one the sidecar join already set. A no-op for a
+ * `teammate_spawned` ACK: Claude Code names that teammate's id in snake_case `agent_id`, which
+ * this camelCase `agentId` read never matches — a teammate still only gets `agentId` from the
+ * sidecar join, same as before this function existed. */
+function recordResultAgentId(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+  const agentId = json.toolUseResult?.agentId;
+  if (typeof agentId !== 'string' || !json.message || !Array.isArray(json.message.content)) {
+    return;
+  }
+  for (const block of json.message.content) {
+    const sub = block.type === 'tool_result' && block.tool_use_id ? currentSubagents.get(block.tool_use_id) : undefined;
+    if (sub && !sub.agentId) {
+      sub.agentId = agentId;
+    }
+  }
+}
+
+function isLaunchOrSendMessageAck(json: LogEntry): boolean {
+  return isAsyncLaunchAck(json) || isSendMessageAck(json);
 }
 
 function isAsyncLaunchAck(json: LogEntry): boolean {
@@ -113,16 +147,36 @@ function isAsyncLaunchAck(json: LogEntry): boolean {
   return status === 'async_launched' || status === 'teammate_spawned';
 }
 
-function isSendMessageResumeAck(json: LogEntry): boolean {
-  // `resumedAgentId` isn't part of LogEntry's typed `toolUseResult` shape — this fix stays scoped
-  // to subagentDetector.ts, so the value is widened to unknown and narrowed locally here instead
-  // of touching the shared parser type (mirrors subagentMetadata.ts's sidecar field reads).
+function isSendMessageAck(json: LogEntry): boolean {
+  // `resumedAgentId`/`pin`/`routing` aren't part of LogEntry's typed `toolUseResult` shape — this
+  // fix stays scoped to subagentDetector.ts, so the value is widened to unknown and narrowed
+  // locally here instead of touching the shared parser type (mirrors subagentMetadata.ts's
+  // sidecar field reads).
+  // Three successful shapes, none a completion — all mean the target is still alive:
+  //   - a resume of a finished Agent-tool subagent: {success, message, resumedAgentId, pin}
+  //   - a message queued for a still-running Agent-tool subagent: {success, message, pin}
+  //     ("Message queued for delivery to <id> at its next tool round.")
+  //   - a message sent to a still-running in-process TEAMMATE's inbox: {success, message, msg_id,
+  //     routing:{content, sender, summary, target, targetColor}} ("Message sent to <name>'s
+  //     inbox") — no `pin` at all (real corpus, session f03a74fb).
+  // A failed send is {success: false, message, display} — no pin/routing — and a cross-session
+  // send has its own shape too; both lack pin AND routing, so both still fall through to
+  // markStopped, which is a no-op (or, for a real reactivation, undoes one that never happened).
   const result: unknown = json.toolUseResult;
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    typeof (result as Record<string, unknown>).resumedAgentId === 'string'
-  );
+  if (typeof result !== 'object' || result === null) {
+    return false;
+  }
+  const fields = result as Record<string, unknown>;
+  if (typeof fields.resumedAgentId === 'string') {
+    return true;
+  }
+  return fields.success === true && (isAliveMarker(fields.pin) || isAliveMarker(fields.routing));
+}
+
+/** A non-null object value — `pin` (Agent-tool subagent) or `routing` (in-process teammate) are
+ * both only ever present, as objects, on a successful send to a still-alive target. */
+function isAliveMarker(value: unknown): boolean {
+  return typeof value === 'object' && value !== null;
 }
 
 /** A backgrounded agent reports completion as a <task-notification> turn in the PARENT transcript.
@@ -140,13 +194,14 @@ function detectTaskNotificationCompletion(json: LogEntry, currentSubagents: Map<
   if (!text.includes('<task-notification>')) {
     return;
   }
+  const at = entryTime(json);
   const toolUseIdMatch = text.match(/<tool-use-id>([^<]+)<\/tool-use-id>/);
   if (toolUseIdMatch) {
-    markStopped(currentSubagents, toolUseIdMatch[1].trim());
+    markStopped(currentSubagents, toolUseIdMatch[1].trim(), at);
   }
   const taskIdMatch = text.match(/<task-id>([^<]+)<\/task-id>/);
   if (taskIdMatch) {
-    markStoppedByTaskId(currentSubagents, taskIdMatch[1].trim());
+    markStoppedByTaskId(currentSubagents, taskIdMatch[1].trim(), at);
   }
 }
 
@@ -174,11 +229,23 @@ function getEntryText(json: LogEntry): string {
   return parts.join('\n');
 }
 
-function markStopped(currentSubagents: Map<string, SubAgent>, id: string): void {
+function markStopped(currentSubagents: Map<string, SubAgent>, id: string, at: number | undefined): void {
   const sub = currentSubagents.get(id);
   if (sub) {
-    sub.status = 'stopped';
+    stop(sub, at);
   }
+}
+
+/** `stoppedAt` feeds subagentRewake.ts: a subagent can start running again after its completion
+ * notification without the parent transcript saying so (see that file). */
+function stop(sub: SubAgent, at: number | undefined): void {
+  sub.status = 'stopped';
+  sub.stoppedAt = at;
+}
+
+function entryTime(json: LogEntry): number | undefined {
+  const t = json.timestamp ? Date.parse(json.timestamp) : NaN;
+  return Number.isNaN(t) ? undefined : t;
 }
 
 /**
@@ -192,14 +259,14 @@ function markStopped(currentSubagents: Map<string, SubAgent>, id: string): void 
  * this path — the one real post-resume notification seen carried BOTH tags, and <tool-use-id>
  * alone already resolved it. This guards a plausible shape that just hasn't shown up yet.
  */
-function markStoppedByTaskId(currentSubagents: Map<string, SubAgent>, taskId: string): void {
+function markStoppedByTaskId(currentSubagents: Map<string, SubAgent>, taskId: string, at: number | undefined): void {
   if (currentSubagents.has(taskId)) {
-    markStopped(currentSubagents, taskId);
+    markStopped(currentSubagents, taskId, at);
     return;
   }
   const fallback = findSubagentByAgentId(currentSubagents, taskId);
   if (fallback) {
-    fallback.status = 'stopped';
+    stop(fallback, at);
   }
 }
 

@@ -9,6 +9,7 @@ export interface SubAgent {
   logFilePath?: string; // Codex agents have their own rollout transcript.
   lastInteractionTime?: number;
   latestUpdate?: string;
+  stoppedAt?: number; // Timestamp (ms) of the transcript entry that last marked this subagent stopped (subagentCompletion.ts) — subagentRewake.ts compares it with the subagent's own transcript mtime
   // "Grandchildren": subagents THIS subagent launched itself (joined on the sidecar's
   // parentAgentId — see subagentMetadata.ts's attachNestedSubagents). Deliberately one level
   // only — a depth-3 chain (a grandchild's own children) is truncated, not represented here.

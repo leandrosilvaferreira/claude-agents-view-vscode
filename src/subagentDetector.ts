@@ -122,7 +122,12 @@ function detectSendMessageResume(json: LogEntry, currentSubagents: Map<string, S
         continue;
       }
       const entry = findSubagentEntryByTarget(currentSubagents, to);
-      if (!entry) {
+      // A SendMessage to a subagent that is still running is a mid-run message, not a resume:
+      // Claude Code ACKs it {success, message: "Message queued for delivery to <id> at its next
+      // tool round.", pin} — no resumedAgentId — and the agent's eventual <task-notification>
+      // still carries its ORIGINAL launch <tool-use-id>. Re-keying it here let this SendMessage's
+      // own ACK tool_result read as its completion (observed 2.1.241 through 2.1.278).
+      if (!entry || entry[1].status === 'working') {
         continue;
       }
       reactivateSubagent(currentSubagents, entry, block.id);
@@ -141,6 +146,7 @@ function reactivateSubagent(currentSubagents: Map<string, SubAgent>, entry: [str
     sub.launchId = oldId;
   }
   sub.status = 'working';
+  sub.stoppedAt = undefined;
   sub.id = newId;
   currentSubagents.set(newId, sub);
 }
