@@ -207,6 +207,13 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   detection; new log-shape handling must cover or explicitly no-op the other brand.
 - **User-facing strings are English** (view messages, `package.json` config
   descriptions); code, identifiers, comments and documentation are English too.
+- **No machine-specific absolute paths** — never hardcode a developer's own path
+  (`/Users/<name>/…`, `C:\Users\<name>\…`, any home dir) in imports, code, tests,
+  scripts or docs: it breaks on every other dev's machine and in CI. Imports are
+  relative (`./`, `../` — `import-x/no-absolute-path` enforces it); runtime locations
+  derive from `os.homedir()`, `__dirname` or `process.cwd()`; docs write `~/.claude/…`.
+  Throwaway/scratch scripts too: run them from the repo root and build paths from
+  `process.cwd()`. Placeholder paths inside test fixtures (`/Users/dev/…`) are data.
 
 ## Engineering rules
 
