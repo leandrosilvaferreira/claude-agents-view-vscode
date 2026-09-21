@@ -54,6 +54,12 @@ describe('architectural lint rules', () => {
 
     expect(ruleIds).toContain('import-x/no-restricted-paths');
   });
+
+  it('rejects absolute import paths, which resolve only on one machine', async () => {
+    const ruleIds = await ruleIdsFor(`import '/abs/checkout/src/logger';\n`, path.join(SRC, 'treeItems.ts'));
+
+    expect(ruleIds).toContain('import-x/no-absolute-path');
+  });
 }, 30000);
 
 describe('import cycle detection', () => {

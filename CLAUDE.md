@@ -120,9 +120,10 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `sessionStatusRefresh.ts`), `lsof` active-status detection (macOS/Linux only), and
   calls dedupe + background-agent nesting before feeding the tree.
 - **sessionStatusRefresh.ts** — the per-session refresh loop run on every 15s tick and
-  file-change refresh: status, then subagent metadata enrichment, then grandchild
-  attachment, in that order — enrichment must run immediately before nesting so a
-  freshly-available `agentId` is picked up the same tick, not the next transcript parse
+  file-change refresh: subagent metadata enrichment, then rewake detection, then grandchild
+  attachment, then status LAST — enrichment must run immediately before the other two so a
+  freshly-available `agentId` is picked up the same tick, not the next transcript parse, and
+  status must run after all three so a subagent flipped back to 'working' this tick counts
   (see its own doc comment). Extracted out of `sessionTreeDataProvider.ts` to stay under
   this repo's 350-line file budget and because vscode-free code here is directly
   unit-testable.
@@ -146,9 +147,10 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   See `.claude/memory/architecture-subagent-dispatch-mechanisms.md`.
 - **subagentCompletion.ts** — the completion half of `subagentDetector` (split out for the
   350-line budget): the launch/resume ACKs that must NOT read as completions
-  (`async_launched`, `teammate_spawned`, SendMessage's `resumedAgentId`) plus the three real
-  completion shapes — synchronous `tool_result`, `<task-notification>`, and an in-process
-  teammate's `<teammate-message>` `idle_notification`.
+  (`async_launched`, `teammate_spawned`, SendMessage's `resumedAgentId`, a queued-message
+  `{success:true, pin}`, or a teammate-inbox send `{success:true, routing}`) plus the three
+  real completion shapes — synchronous `tool_result`, `<task-notification>`, and an
+  in-process teammate's `<teammate-message>` `idle_notification`.
 - **sidecarReader.ts** — reads the `agent-<id>.meta.json` sidecars from both candidate
   directories (the transcript's own and the one `projectPath` encodes to — they differ
   inside a worktree), dedupes across them, and caches by filename set so a refresh that
@@ -157,6 +159,13 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   the sidecar, joined on `toolUseId`. Runs on parse (`logParser`) AND on every refresh
   tick (`sessionStatusRefresh.ts`), immediately before nested-subagent attachment — the
   latter exists so `agentId` isn't stuck unfilled for a subagent's entire live run.
+- **subagentRewake.ts** — re-checks a subagent the parser marked 'stopped', within a 24h
+  horizon of `stoppedAt` (older candidates are skipped before touching disk): if its own
+  `agent-<agentId>.jsonl` was written again after `stoppedAt` (past a 30s write-latency
+  slack margin) and recently (`IDLE_CEILING`), it quietly resumed after its completion
+  `<task-notification>` and is flipped back to 'working'. Runs on the refresh tick, between
+  metadata enrichment and grandchild attachment (`sessionStatusRefresh.ts`) since it needs
+  `agentId` filled first. Antigravity has no sidecars/agentId, so it no-ops for that brand.
 - **nestedSubagents.ts** — attaches grandchildren (subagents launched by a subagent) via
   the sidecar's `parentAgentId`, one level deep, with a best-effort mtime status. Runs on
   the refresh tick (via `sessionStatusRefresh.ts`), NOT on parse: a background subagent
@@ -183,8 +192,8 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   logs via `logDebug` and returns an empty/fallback value; a bad log line must never
   break the tree.
 - **Keep `vscode` out of the parsing core** — `logParser`, `subagentDetector`, `subagentCompletion`,
-  `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`, `sessionActivity`
-  import no `vscode` and are
+  `subagentRewake`, `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`,
+  `sessionActivity` import no `vscode` and are
   unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,
   `treeItems.ts`, `subagentTreeChildren.ts` touch the VS Code API.
 - **Parse incrementally** — `LogParser` caches a per-file byte offset and reads only
@@ -198,6 +207,13 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   detection; new log-shape handling must cover or explicitly no-op the other brand.
 - **User-facing strings are English** (view messages, `package.json` config
   descriptions); code, identifiers, comments and documentation are English too.
+- **No machine-specific absolute paths** — never hardcode a developer's own path
+  (`/Users/<name>/…`, `C:\Users\<name>\…`, any home dir) in imports, code, tests,
+  scripts or docs: it breaks on every other dev's machine and in CI. Imports are
+  relative (`./`, `../` — `import-x/no-absolute-path` enforces it); runtime locations
+  derive from `os.homedir()`, `__dirname` or `process.cwd()`; docs write `~/.claude/…`.
+  Throwaway/scratch scripts too: run them from the repo root and build paths from
+  `process.cwd()`. Placeholder paths inside test fixtures (`/Users/dev/…`) are data.
 
 ## Engineering rules
 

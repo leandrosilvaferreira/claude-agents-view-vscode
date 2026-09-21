@@ -326,6 +326,9 @@ describe('detectSubagents — forked skill launch (context: fork)', () => {
     // session 'working' too via sessionDedupe.applyNestedAgentLiveness.
     const subagents = new Map<string, SubAgent>();
     detectSubagents(JSON.parse(REAL_FORKED_SKILL_LAUNCH_LINE) as LogEntry, subagents);
+    // A resume only ever targets a FINISHED subagent — a SendMessage to a running one is a mid-run
+    // message and must leave it keyed as-is (see detectSendMessageResume).
+    detectSubagents(forkedSkillTaskNotification('a2e15c98935a695a32', 'user-turn'), subagents);
 
     detectSubagents(sendMessageTurn('toolu_resume_1', 'code-review'), subagents);
     expect(subagents.has('a2e15c98935a695a32')).toBe(false); // re-keyed away, same as the classic resume case

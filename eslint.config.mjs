@@ -12,7 +12,13 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 // parsing core"). Source files are flat under `src/`, so the layers are classified as
 // `boundaries/files` categories — `boundaries/elements` patterns match folders, not
 // individual files.
-const VSCODE_LAYER_MODULES = ['extension', 'sessionTreeDataProvider', 'sessionFileWatchers', 'treeItems', 'subagentTreeChildren'];
+const VSCODE_LAYER_MODULES = [
+  'extension',
+  'sessionTreeDataProvider',
+  'sessionFileWatchers',
+  'treeItems',
+  'subagentTreeChildren',
+];
 const VSCODE_LAYER_GLOB = `src/{${VSCODE_LAYER_MODULES.join(',')}}.ts`;
 // Negated rather than a plain `src/*.ts` catch-all: categories match independently, so
 // an inclusive pattern would tag the VS Code modules as `core` as well and the layer
@@ -118,6 +124,8 @@ export default defineConfig(
       'import-x/no-self-import': 'error',
       'import-x/no-useless-path-segments': 'error',
       'import-x/no-duplicates': 'error',
+      // A developer's absolute path (`/Users/<name>/...`) resolves only on that machine.
+      'import-x/no-absolute-path': 'error',
       // Cross-import validation: production code must never reach into test code.
       // The layer rule (core must not import the VS Code layer) is enforced
       // separately by `boundaries` below.
