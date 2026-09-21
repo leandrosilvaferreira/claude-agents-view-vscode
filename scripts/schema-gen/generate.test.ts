@@ -9,6 +9,8 @@ function writeLines(filePath: string, lines: string[]): void {
   fs.writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
 }
 
+const SESSION_FILE = 'session.jsonl';
+
 describe('generateSchema (T11 CLI orchestrator)', () => {
   // A scratch dir under the OS temp dir — never the developer's real ~/.claude/projects
   // corpus, and never the repo's committed schema-observations.json/transcriptShapes.ts/
@@ -34,7 +36,7 @@ describe('generateSchema (T11 CLI orchestrator)', () => {
   });
 
   it('runs the full pipeline against a scratch corpus without throwing, and writes every artifact', async () => {
-    writeLines(path.join(corpusRoot, 'session.jsonl'), [
+    writeLines(path.join(corpusRoot, SESSION_FILE), [
       '{"type":"user","version":"2.1.210","message":{"role":"user","content":"hello there"},"zzTestOnlyUnknownField":"a"}',
       '{"type":"user","version":"2.1.210","message":{"role":"user","content":"another one"},"zzTestOnlyUnknownField":"b"}',
       '{"type":"assistant","version":"2.1.210","message":{"role":"assistant","content":"hi"}}',
@@ -70,11 +72,11 @@ describe('generateSchema (T11 CLI orchestrator)', () => {
   });
 
   it('loads the existing schema-observations.json and merges a second run on top, additively', async () => {
-    writeLines(path.join(corpusRoot, 'session.jsonl'), ['{"type":"user","version":"2.1.210","message":"first run"}']);
+    writeLines(path.join(corpusRoot, SESSION_FILE), ['{"type":"user","version":"2.1.210","message":"first run"}']);
     await generateSchema({ corpusRoot, observationsPath, tsReferencePath, fixturesDir });
 
     const secondCorpusRoot = path.join(scratchRoot, 'corpus-2');
-    writeLines(path.join(secondCorpusRoot, 'session.jsonl'), [
+    writeLines(path.join(secondCorpusRoot, SESSION_FILE), [
       '{"type":"summary","version":"2.1.218","summary":"second run"}',
     ]);
     const second = await generateSchema({
@@ -89,5 +91,90 @@ describe('generateSchema (T11 CLI orchestrator)', () => {
     expect(second.model.types.user.sampleCount).toBe(1);
     expect(second.model.types.summary.sampleCount).toBe(1);
     expect(second.model.cliVersionsObserved).toEqual(['2.1.210', '2.1.218']);
+  });
+
+  it('reports a start line, phase lines per artifact, and a final line through the progress sink', async () => {
+    writeLines(path.join(corpusRoot, 'progress-session.jsonl'), ['{"type":"user","version":"2.1.210","message":"hi"}']);
+
+    const lines: string[] = [];
+    await generateSchema({
+      corpusRoot,
+      observationsPath,
+      tsReferencePath,
+      fixturesDir,
+      progress: { onLine: (line) => lines.push(line) },
+    });
+
+    // Start line: announced once, before any file is read, naming the corpus root.
+    expect(lines[0]).toContain('scanning corpus');
+    expect(lines[0]).toContain(corpusRoot);
+    // The walk's forced final line, and a phase line per artifact this run writes — present
+    // regardless of throttling timing, since none of these go through the throttle window.
+    expect(lines.some((line) => line.includes('done:'))).toBe(true);
+    expect(lines.some((line) => line.includes('writing observations'))).toBe(true);
+    expect(lines.some((line) => line.includes('writing TS reference'))).toBe(true);
+    expect(lines.some((line) => line.includes('writing fixtures'))).toBe(true);
+  });
+});
+
+// Sibling top-level describe (not nested in the one above) so its line count doesn't push that
+// describe past this repo's max-lines-per-function limit — same reasoning as the sibling
+// describes in schemaAggregator.test.ts/keySafety.test.ts/redact.test.ts. Its own scratch-dir
+// setup mirrors the main describe's above.
+describe('generateSchema — re-sanitizes a leaked baseline before merging (sanitizeBaseline.ts)', () => {
+  let scratchRoot: string;
+  let corpusRoot: string;
+  let observationsPath: string;
+  let tsReferencePath: string;
+  let fixturesDir: string;
+
+  beforeEach(() => {
+    scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'schema-generate-sanitize-test-'));
+    corpusRoot = path.join(scratchRoot, 'corpus');
+    observationsPath = path.join(scratchRoot, 'schema-observations.json');
+    tsReferencePath = path.join(scratchRoot, 'generated', 'transcriptShapes.ts');
+    fixturesDir = path.join(scratchRoot, 'fixtures', 'schema-corpus');
+  });
+
+  afterEach(() => {
+    fs.rmSync(scratchRoot, { recursive: true, force: true });
+  });
+
+  it('re-sanitizes a leaked literal path already committed in schema-observations.json instead of carrying it forward forever', async () => {
+    // Simulates a baseline committed before `structuredContent` was added to
+    // KNOWN_DYNAMIC_KEY_CONTAINERS: a literal third-party MCP field name sitting right in the
+    // committed file. mergeSchemaObservations alone would just add a new run's facts on top of
+    // this forever — sanitizeBaseline must clean it up before that merge happens.
+    const leakedBaseline = {
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      cliVersionsObserved: ['2.1.200'],
+      types: {
+        user: {
+          sampleCount: 1,
+          firstSeenVersion: '2.1.200',
+          lastSeenVersion: '2.1.200',
+          fields: {
+            'mcpMeta.structuredContent.issueTitle': {
+              types: ['string'],
+              presentCount: 1,
+              firstSeenVersion: '2.1.200',
+              lastSeenVersion: '2.1.200',
+            },
+          },
+        },
+      },
+      unknownTypes: {},
+    };
+    fs.mkdirSync(path.dirname(observationsPath), { recursive: true });
+    fs.writeFileSync(observationsPath, JSON.stringify(leakedBaseline), 'utf8');
+    writeLines(path.join(corpusRoot, SESSION_FILE), ['{"type":"user","version":"2.1.220","message":"hi"}']);
+
+    const result = await generateSchema({ corpusRoot, observationsPath, tsReferencePath, fixturesDir });
+
+    const fields = result.model.types.user.fields;
+    expect(fields['mcpMeta.structuredContent.[dynamic-key]']).toBeDefined();
+    expect(fields['mcpMeta.structuredContent.issueTitle']).toBeUndefined();
+    const onDisk: unknown = JSON.parse(fs.readFileSync(observationsPath, 'utf8'));
+    expect(JSON.stringify(onDisk)).not.toContain('issueTitle');
   });
 });

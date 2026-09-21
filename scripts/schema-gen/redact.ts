@@ -47,7 +47,11 @@ interface RedactionCounters {
 
 function redactValue(value: unknown, key: string | undefined, counters: RedactionCounters): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => redactValue(item, undefined, counters));
+    // Forward `key` unchanged — a known dynamic-key container's value can itself be an array of
+    // maps (`answers: [{ LICENSE: 'x' }]`); passing `undefined` here lost the container context
+    // at the array boundary, so redactObject below never saw isKnownDynamicKeyContainer(key) for
+    // the elements and their real keys leaked through literally.
+    return value.map((item) => redactValue(item, key, counters));
   }
   if (isPlainObject(value)) {
     // Known dynamic-key-map container (e.g. toolUseResult.answers) — every key inside `value`

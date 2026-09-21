@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { walkCorpus } from './corpusWalker';
+import { walkCorpus, WalkProgressCallback } from './corpusWalker';
 import { redact } from './redact';
 
 /**
@@ -59,11 +59,20 @@ export interface FixtureBucketResult {
  * per bucket into `outputDir`. Lines with no usable `type` are skipped, and so are parse
  * errors from the walk — this generator only cares about lines it can actually turn into a
  * fixture sample.
+ *
+ * `onProgress`, when given, is forwarded as-is to this function's own independent walkCorpus()
+ * pass (see this file's header comment for why it's a second walk rather than reusing T7's
+ * aggregated model) — so a caller can report on this pass exactly like the corpus's first
+ * walk. Omitted by default, so every existing caller/test is unaffected.
  */
-export async function generateFixtures(corpusRoot: string, outputDir: string): Promise<FixtureBucketResult[]> {
+export async function generateFixtures(
+  corpusRoot: string,
+  outputDir: string,
+  onProgress?: WalkProgressCallback,
+): Promise<FixtureBucketResult[]> {
   const samplesByBucket = new Map<string, Record<string, unknown>[]>();
 
-  for await (const result of walkCorpus(corpusRoot)) {
+  for await (const result of walkCorpus(corpusRoot, onProgress)) {
     if (!result.ok) {
       continue;
     }

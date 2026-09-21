@@ -9,9 +9,11 @@ import {
   saveSchemaObservations,
   SchemaObservationModel,
 } from './schemaModel';
+import { sanitizeBaseline } from './sanitizeBaseline';
 import { generateTsReference } from './generateTsReference';
 import { generateFixtures, FixtureBucketResult } from './generateFixtures';
 import { diffLogEntry, extractInterfacePropertyNames } from './diffLogEntry';
+import { createProgressReporter, ProgressReporter, ProgressSink } from './progressReporter';
 
 /**
  * CLI orchestrator (T11, see transcript-schema-gen.md): walk the local transcript corpus
@@ -66,6 +68,10 @@ export interface GenerateOptions {
   tsReferencePath?: string;
   fixturesDir?: string;
   logEntrySourcePath?: string;
+  /** Opt-in stderr progress reporting (see progressReporter.ts) for the corpus walk and each
+   * pipeline phase. Omitted by default, so every existing caller/test stays silent and
+   * deterministic; the CLI entry point below is the one place that supplies a real sink. */
+  progress?: ProgressSink;
 }
 
 export interface GenerateSummary {
@@ -127,6 +133,29 @@ function printReport(parseErrorCount: number, undocumentedFields: string[]): voi
   }
 }
 
+/** Merges this run's model onto the previously committed one, stamps it, and saves it —
+ * split out of generateSchema() purely to keep that function's statement count under this
+ * repo's lint budget once progress phase lines were added around it.
+ *
+ * The loaded baseline is re-sanitized (sanitizeBaseline.ts) before the merge, not after:
+ * mergeSchemaObservations is additive-only, so a literal path that leaked into a past commit
+ * (e.g. before a container was added to KNOWN_DYNAMIC_KEY_CONTAINERS) would otherwise survive
+ * every future merge forever — sanitizing the incoming `runModel` alone can't reach it. */
+function mergeAndSaveObservations(
+  resolved: ResolvedOptions,
+  runModel: SchemaObservationModel,
+  reporter: ProgressReporter,
+): SchemaObservationModel {
+  reporter.phase('aggregating and finalizing observations');
+  const existing = sanitizeBaseline(loadSchemaObservations(resolved.observationsPath));
+  const merged = mergeSchemaObservations(existing, runModel);
+  const stamped: SchemaObservationModel = { ...merged, generatedAt: new Date().toISOString() };
+
+  reporter.phase(`writing observations: ${resolved.observationsPath}`);
+  saveSchemaObservations(resolved.observationsPath, stamped);
+  return stamped;
+}
+
 /**
  * Runs the full pipeline once and returns its result. The CLI entry point below calls this
  * with every default; generate.test.ts calls it with every path pointed at a scratch
@@ -134,16 +163,27 @@ function printReport(parseErrorCount: number, undocumentedFields: string[]): voi
  */
 export async function generateSchema(options: GenerateOptions = {}): Promise<GenerateSummary> {
   const resolved = resolveOptions(options);
+  const reporter = createProgressReporter(options.progress ?? {}, resolved.corpusRoot);
 
-  const { model: runModel, parseErrors } = await aggregateSchema(walkCorpus(resolved.corpusRoot));
-  const existing = loadSchemaObservations(resolved.observationsPath);
-  const merged = mergeSchemaObservations(existing, runModel);
-  const stamped: SchemaObservationModel = { ...merged, generatedAt: new Date().toISOString() };
-  saveSchemaObservations(resolved.observationsPath, stamped);
+  const { model: runModel, parseErrors } = await aggregateSchema(
+    walkCorpus(resolved.corpusRoot, reporter.onWalkProgress),
+  );
+  reporter.finishWalk();
 
+  const stamped = mergeAndSaveObservations(resolved, runModel, reporter);
+
+  reporter.phase(`writing TS reference: ${resolved.tsReferencePath}`);
   const tsReference = await writeTsReference(resolved.tsReferencePath, generateTsReference(stamped));
 
-  const fixtures = await generateFixtures(resolved.corpusRoot, resolved.fixturesDir);
+  reporter.phase(`writing fixtures: ${resolved.fixturesDir}`);
+  // generateFixtures does its own independent second walkCorpus() pass over the same corpus
+  // (see its own doc comment) — on a multi-GB corpus that's another long silent stretch, so
+  // it gets its own labelled reporter rather than reusing `reporter` above: separate start
+  // time (this pass's elapsed/ETA should reflect its own duration, not pass one's) and a
+  // `label` so its lines read as obviously distinct from pass one's on stderr.
+  const fixturesReporter = createProgressReporter(options.progress ?? {}, resolved.corpusRoot, 'fixtures pass');
+  const fixtures = await generateFixtures(resolved.corpusRoot, resolved.fixturesDir, fixturesReporter.onWalkProgress);
+  fixturesReporter.finishWalk();
 
   const knownPropertyNames = extractInterfacePropertyNames(resolved.logEntrySourcePath, LOG_ENTRY_INTERFACE_NAME);
   const undocumentedFields = diffLogEntry(stamped, knownPropertyNames);
@@ -164,7 +204,10 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  generateSchema().catch((error: unknown) => {
+  // Real CLI run: the one place that turns progress reporting on, writing plain-text lines
+  // to stderr so stdout keeps carrying only the final report (see printReport above).
+  const progress: ProgressSink = { onLine: (line) => process.stderr.write(`${line}\n`) };
+  generateSchema({ progress }).catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
   });

@@ -10,11 +10,18 @@
  * that shape (and any future field with the same problem) before a key's own text — not just
  * its value — ends up in a generated artifact.
  *
- * Two known gaps in judging a key by shape alone, both closed by what's below:
+ * Three known gaps in judging a key by shape alone, all closed by what's below:
  *  - A key can look like a plain identifier (pass `SCHEMA_LIKE_KEY`) yet still be an inherited
  *    `Object.prototype` member name (`constructor`, `toString`, `__proto__`, ...) — dangerous
  *    downstream via `key in obj`/`obj[key]` reads and writes. `isSchemaLikeKey` itself rejects
  *    these; see `isObjectPrototypeMember`.
+ *  - A key can look like a plain identifier, and not be an `Object.prototype` member, yet still
+ *    be an opaque id minted fresh on every tool call (`toolu_…`, `srvtoolu_…`, `msg_…`) rather
+ *    than a fixed field name — e.g. Claude Code 2.1.270+'s `wireToolInputs` and 2.1.272+'s
+ *    `wireIngestContext`, both maps keyed by tool_use id, mint ~3 new field paths *per tool
+ *    call* (94,004 paths observed on a full corpus pull before this fix — quadratic
+ *    schema:generate, since each new path also grows every future merge). `isSchemaLikeKey`
+ *    itself rejects these too; see `OPAQUE_ID_KEY`.
  *  - A key can look like a plain identifier yet still be real, untrusted *content* — e.g. a
  *    tracked filename (`LICENSE`) or a bare-word answer label — when it comes from a field
  *    that's known to be a dynamic-key map rather than a fixed schema. `isSchemaLikeKey` can't
@@ -49,8 +56,21 @@ function isObjectPrototypeMember(key: string): boolean {
   return Object.hasOwn(Object.prototype, key);
 }
 
+/**
+ * Opaque per-call ids used as map keys — the Anthropic API id family (`toolu_01…`, `srvtoolu_01…`,
+ * `msg_01…`, `req_01…`) and its Bedrock/Vertex-routed variants (`toolu_bdrk_01…`, `toolu_vrtx_01…`,
+ * `msg_bdrk_01…`): lowercase prefix, an optional lowercase infix (`bdrk`/`vrtx`), one final `_`,
+ * ≥16-char base62 body with a digit. Passes SCHEMA_LIKE_KEY yet is minted per tool call: Claude
+ * Code 2.1.270+ `wireToolInputs` / 2.1.272+ `wireIngestContext` are maps keyed by tool_use id
+ * (~3 new paths per call → quadratic schema:generate). Judged by shape, so the next map keyed by
+ * this id family — Bedrock/Vertex included — is caught without first being listed. Validated
+ * against 20,460 real committed keys: still matches only wireToolInputs/wireIngestContext
+ * children. Real field names never match: snake_case has several `_` or a short tail.
+ */
+const OPAQUE_ID_KEY = /^[a-z]{2,16}(?:_[a-z]{2,8})?_(?=[A-Za-z0-9]*[0-9])[A-Za-z0-9]{16,}$/;
+
 export function isSchemaLikeKey(key: string): boolean {
-  return SCHEMA_LIKE_KEY.test(key) && !isObjectPrototypeMember(key);
+  return SCHEMA_LIKE_KEY.test(key) && !isObjectPrototypeMember(key) && !OPAQUE_ID_KEY.test(key);
 }
 
 /**
@@ -68,6 +88,9 @@ export const KNOWN_DYNAMIC_KEY_CONTAINERS: ReadonlySet<string> = new Set([
   'trackedFileBackups', // snapshot.trackedFileBackups — keyed by the real tracked filename
   'artifacts', // keyed by an artifact id/name
   '_meta', // mcpMeta._meta — MCP metadata map, keyed by arbitrary MCP-defined keys
+  'wireToolInputs', // assistant.wireToolInputs — CLI 2.1.270+, keyed by tool_use id
+  'wireIngestContext', // assistant.wireIngestContext — CLI 2.1.272+, keyed by tool_use id
+  'structuredContent', // user.mcpMeta.structuredContent — keyed by field names a third-party MCP server defines
 ]);
 
 export function isKnownDynamicKeyContainer(key: string): boolean {

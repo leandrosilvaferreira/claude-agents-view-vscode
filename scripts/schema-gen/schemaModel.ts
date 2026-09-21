@@ -52,12 +52,12 @@ export function createEmptyModel(): SchemaObservationModel {
 
 /** Naive dotted-numeric version compare (e.g. "2.1.9" < "2.1.10" — a plain string compare
  * would get this backwards). Falls back to a per-component string compare when a
- * component isn't numeric. Local to this file on purpose: scripts/ deliberately stays
- * outside the root TS project (transcript-schema-gen.md, T8/T17's reasoning), so this
- * can't import src/claudeCompat.ts's own compareVersions.
+ * component isn't numeric. Exported for schemaAggregator.ts's mutable accumulator too, but
+ * still hand-rolled here rather than imported from src/claudeCompat.ts: scripts/ deliberately
+ * stays outside the root TS project (transcript-schema-gen.md, T8/T17's reasoning).
  * ponytail: no semver pre-release/build-metadata handling — upgrade if CLI versions ever
  * grow a `-beta.1`-style suffix. */
-function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
   const partsA = a.split('.');
   const partsB = b.split('.');
   const length = Math.max(partsA.length, partsB.length);
@@ -76,11 +76,11 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-function earliestVersion(a: string, b: string): string {
+export function earliestVersion(a: string, b: string): string {
   return compareVersions(a, b) <= 0 ? a : b;
 }
 
-function latestVersion(a: string, b: string): string {
+export function latestVersion(a: string, b: string): string {
   return compareVersions(a, b) >= 0 ? a : b;
 }
 
@@ -144,7 +144,12 @@ function mergeTypeUnion(a: string[], b: string[]): string[] {
   return Array.from(new Set([...a, ...b])).sort();
 }
 
-function mergeFieldObservation(a: FieldObservation, b: FieldObservation): FieldObservation {
+/** Sums `presentCount` across two *different lines'* sightings of the same field path — the
+ * cross-line counterpart of schemaAggregator.ts's own `combineSameLineFieldObservations`
+ * (which keeps `presentCount` at 1 for multiple sightings within one line). Exported so
+ * schemaAggregator.ts's per-bucket accumulator can reuse this exact merge rule instead of
+ * duplicating it. */
+export function mergeFieldObservation(a: FieldObservation, b: FieldObservation): FieldObservation {
   return {
     types: mergeTypeUnion(a.types, b.types),
     presentCount: a.presentCount + b.presentCount,
@@ -176,11 +181,28 @@ function mergeFields(
   return Object.fromEntries(merged);
 }
 
-function mergeTypeObservation(a: TypeObservation, b: TypeObservation): TypeObservation {
+/** The `sampleCount`/`firstSeenVersion`/`lastSeenVersion` header shared by every TypeObservation
+ * shape in this pipeline, including schemaAggregator.ts's mutable per-run accumulator (which adds
+ * its own `fields: Map` on top — structurally compatible here since only these three fields are
+ * read). */
+type TypeObservationHeader = Pick<TypeObservation, 'sampleCount' | 'firstSeenVersion' | 'lastSeenVersion'>;
+
+/** Merges two TypeObservation headers: sums `sampleCount`, widens `firstSeenVersion`/
+ * `lastSeenVersion`. Shared by `mergeTypeObservation` below (the immutable, whole-model merge
+ * path) and schemaAggregator.ts's `foldBucket` (the mutable, per-run accumulator) so the exact
+ * same header-merge rule isn't hand-duplicated in both places — mirrors `mergeFieldObservation`'s
+ * own sharing across the same two files. */
+export function mergeTypeHeader(a: TypeObservationHeader, b: TypeObservationHeader): TypeObservationHeader {
   return {
     sampleCount: a.sampleCount + b.sampleCount,
     firstSeenVersion: earliestVersion(a.firstSeenVersion, b.firstSeenVersion),
     lastSeenVersion: latestVersion(a.lastSeenVersion, b.lastSeenVersion),
+  };
+}
+
+function mergeTypeObservation(a: TypeObservation, b: TypeObservation): TypeObservation {
+  return {
+    ...mergeTypeHeader(a, b),
     fields: mergeFields(a.fields, b.fields),
   };
 }

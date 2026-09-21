@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { generateFixtures } from './generateFixtures';
+import { WalkProgress } from './corpusWalker';
 
 const CORPUS_FILE = 'session.jsonl';
 
@@ -105,5 +106,17 @@ describe('generateFixtures', () => {
     const results = await generateFixtures(corpusRoot, outputDir);
 
     expect(results).toEqual([]);
+  });
+
+  it('forwards progress events to an onProgress callback, reaching the file total', async () => {
+    writeLines(path.join(corpusRoot, CORPUS_FILE), ['{"type":"user"}', '{"type":"assistant"}']);
+
+    const snapshots: WalkProgress[] = [];
+    await generateFixtures(corpusRoot, outputDir, (progress) => snapshots.push(progress));
+
+    expect(snapshots.length).toBeGreaterThan(0);
+    const last = snapshots[snapshots.length - 1];
+    expect(last.filesTotal).toBe(1);
+    expect(last.filesProcessed).toBe(last.filesTotal);
   });
 });

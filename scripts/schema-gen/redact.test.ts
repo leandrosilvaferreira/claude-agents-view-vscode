@@ -14,6 +14,7 @@ interface RedactableLine {
 }
 
 const PLACEHOLDER = /^Sample text \d+$/;
+const TRACKED_FILE_CONTENT = 'real tracked content';
 
 describe('redact', () => {
   it('replaces a real-looking prompt, an absolute home-dir path, and a branch name', () => {
@@ -121,17 +122,63 @@ describe('redact', () => {
   // passes isSchemaLikeKey on shape alone, but every child of a known dynamic-key-map
   // container must be treated as unsafe regardless — this is the real LICENSE/NOTICE case
   // already observed in the committed src/generated/transcriptShapes.ts before this fix.
-  it.each(['answers', 'trackedFileBackups', 'artifacts', '_meta'])(
+  it.each([
+    'answers',
+    'trackedFileBackups',
+    'artifacts',
+    '_meta',
+    'wireToolInputs',
+    'wireIngestContext',
+    'structuredContent',
+  ])(
     'redacts a bare, identifier-shaped child key under the known dynamic-key container %j instead of keeping it literally',
     (containerKey) => {
-      const line = { type: 'tool_result', [containerKey]: { LICENSE: 'real tracked content' } };
+      const line = { type: 'tool_result', [containerKey]: { LICENSE: TRACKED_FILE_CONTENT } };
 
       const result = redact(line);
       const serialized = JSON.stringify(result);
 
       expect(serialized).not.toContain('LICENSE');
-      expect(serialized).not.toContain('real tracked content');
+      expect(serialized).not.toContain(TRACKED_FILE_CONTENT);
       expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
     },
   );
+});
+
+// Sibling top-level describe (not nested in the one above) so its line count doesn't push
+// that describe past this repo's max-lines-per-function limit — same reasoning as the
+// Finding A/B blocks in schemaAggregator.test.ts and keySafety.test.ts.
+describe('redact — dynamic-key container value wrapped in an array', () => {
+  // The array branch used to drop the container `key` when recursing into elements
+  // (`redactValue(item, undefined, counters)`), so a container whose value is an array of maps
+  // leaked its real keys straight through redactObject's forceDynamicKey check.
+  it('redacts a bare, identifier-shaped child key under a known dynamic-key container even when the container value is an array of maps', () => {
+    const line = { type: 'tool_result', answers: [{ LICENSE: TRACKED_FILE_CONTENT }] };
+
+    const result = redact(line);
+    const serialized = JSON.stringify(result);
+
+    expect(serialized).not.toContain('LICENSE');
+    expect(serialized).not.toContain(TRACKED_FILE_CONTENT);
+    expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+  });
+});
+
+// Sibling top-level describe (not nested in the one above) so its line count doesn't push
+// that describe past this repo's max-lines-per-function limit — same reasoning as the
+// Finding A/B blocks in schemaAggregator.test.ts and keySafety.test.ts.
+describe('redact — opaque per-call ids (Finding C)', () => {
+  // An opaque per-call id (e.g. Claude Code 2.1.270+'s wireToolInputs, keyed by tool_use id)
+  // is syntactically a plain identifier, so this must go through isSchemaLikeKey's
+  // OPAQUE_ID_KEY check alone — the parent key here (`toolCallIndex`) is deliberately NOT a
+  // known dynamic-key container, so the container-list defense-in-depth can't be doing the work.
+  it('redacts an opaque per-call id key (e.g. toolu_…) via isSchemaLikeKey alone, even outside a known dynamic-key container', () => {
+    const line = { type: 'assistant', toolCallIndex: { toolu_01AbCdEfGhIjKlMnOpQrStUv: 'value' } };
+
+    const result = redact(line);
+    const serialized = JSON.stringify(result);
+
+    expect(serialized).not.toContain('toolu_01AbCdEfGhIjKlMnOpQrStUv');
+    expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+  });
 });
