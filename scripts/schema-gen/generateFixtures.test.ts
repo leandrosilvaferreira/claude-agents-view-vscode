@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { generateFixtures } from './generateFixtures';
+import { WalkProgress } from './corpusWalker';
 
 const CORPUS_FILE = 'session.jsonl';
 
@@ -37,11 +38,11 @@ describe('generateFixtures', () => {
 
   it('writes exactly 3 sample lines, in encounter order, when the corpus has 5 lines of the same type', async () => {
     writeLines(path.join(corpusRoot, CORPUS_FILE), [
-      '{"type":"user","seq":1}',
-      '{"type":"user","seq":2}',
-      '{"type":"user","seq":3}',
-      '{"type":"user","seq":4}',
-      '{"type":"user","seq":5}',
+      '{"type":"user","status":"first"}',
+      '{"type":"user","status":"second"}',
+      '{"type":"user","status":"third"}',
+      '{"type":"user","status":"fourth"}',
+      '{"type":"user","status":"fifth"}',
     ]);
 
     const results = await generateFixtures(corpusRoot, outputDir);
@@ -52,11 +53,14 @@ describe('generateFixtures', () => {
 
     const lines = readFixtureLines(results[0].filePath);
     expect(lines).toHaveLength(3);
-    // Numbers are never redacted (redact.ts only replaces string leaves), so `seq` is a
-    // trustworthy witness that the first 3 lines were kept, not an arbitrary 3.
-    expect(lines[0]).toContain('"seq":1');
-    expect(lines[1]).toContain('"seq":2');
-    expect(lines[2]).toContain('"seq":3');
+    // `status` is an allowlisted, closed-vocabulary-shaped field (redact.ts), so it survives
+    // redaction literally — a trustworthy witness that the first 3 lines were kept, not an
+    // arbitrary 3. A numeric field would NOT work here: every numeric leaf redacts to 0 by
+    // default (redact.ts, privacy hardening) unless the extension's own parser reads it off a
+    // transcript entry, so a plain incrementing `seq` number can no longer prove ordering.
+    expect(lines[0]).toContain('"status":"first"');
+    expect(lines[1]).toContain('"status":"second"');
+    expect(lines[2]).toContain('"status":"third"');
   });
 
   it('redacts every written line — a fake absolute path and prompt text never appear raw in the output', async () => {
@@ -105,5 +109,17 @@ describe('generateFixtures', () => {
     const results = await generateFixtures(corpusRoot, outputDir);
 
     expect(results).toEqual([]);
+  });
+
+  it('forwards progress events to an onProgress callback, reaching the file total', async () => {
+    writeLines(path.join(corpusRoot, CORPUS_FILE), ['{"type":"user"}', '{"type":"assistant"}']);
+
+    const snapshots: WalkProgress[] = [];
+    await generateFixtures(corpusRoot, outputDir, (progress) => snapshots.push(progress));
+
+    expect(snapshots.length).toBeGreaterThan(0);
+    const last = snapshots[snapshots.length - 1];
+    expect(last.filesTotal).toBe(1);
+    expect(last.filesProcessed).toBe(last.filesTotal);
   });
 });

@@ -189,7 +189,16 @@ describe('aggregateSchema — known dynamic-key containers (Finding B)', () => {
   // real in the committed src/generated/transcriptShapes.ts before this fix) passes
   // isSchemaLikeKey on shape alone, but every child of a known dynamic-key-map container
   // must collapse onto [dynamic-key] regardless of its own shape.
-  it.each(['answers', 'trackedFileBackups', 'artifacts', '_meta'])(
+  it.each([
+    'answers',
+    'trackedFileBackups',
+    'artifacts',
+    '_meta',
+    'wireToolInputs',
+    'wireIngestContext',
+    'structuredContent',
+    'properties',
+  ])(
     'collapses a bare, identifier-shaped child key under the known dynamic-key container %j onto [dynamic-key]',
     async (containerKey) => {
       const line = parsedLine({ type: 'user', [containerKey]: { LICENSE: 'real tracked content' } });
@@ -201,4 +210,96 @@ describe('aggregateSchema — known dynamic-key containers (Finding B)', () => {
       expect(paths).not.toContain(`${containerKey}.LICENSE`);
     },
   );
+
+  // Finding C, end-to-end: Claude Code 2.1.270+ mints a fresh toolu_ id key under
+  // wireToolInputs on every tool call. Without this fix that would mint ~3 new field paths
+  // per call (quadratic schema:generate) instead of collapsing onto one shared path.
+  it('collapses an opaque per-call id under wireToolInputs instead of minting a new field path per tool call', async () => {
+    const line = parsedLine({
+      type: 'assistant',
+      wireToolInputs: { toolu_01AbCdEfGhIjKlMnOpQrStUv: { command: 'ls', description: 'list files' } },
+    });
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.assistant.fields);
+    expect(paths).toContain('wireToolInputs.[dynamic-key]');
+    expect(paths.some((path) => path.includes('toolu_'))).toBe(false);
+  });
+
+  // The array branch used to drop ctx.forceDynamicKey when recursing into elements, so a
+  // container whose value is an array of maps leaked its real keys — the array boundary itself
+  // (walkValue's Array.isArray branch, reached before the object-key loop that checks
+  // forceDynamicKey) never carried the flag onto each element's own context.
+  it('collapses a dynamic-key container child even when the container value is an array of maps', async () => {
+    const line = parsedLine({ type: 'user', answers: [{ LICENSE: 'real tracked content' }] });
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.user.fields);
+    expect(paths).toContain('answers.[].[dynamic-key]');
+    expect(paths).not.toContain('answers.[].LICENSE');
+  });
+});
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — same reasoning as the Finding A/B/C blocks.
+describe('aggregateSchema — Object.prototype member name as a top-level `type` value', () => {
+  // The old incident (schemaModel.test.ts's "Object.prototype member names as type-bucket/field
+  // keys" describe) was a bare `{"type":"__proto__"}` line crashing a plain-object accumulator
+  // keyed directly by `type`. That accumulation now lives in this file's own `foldBucket`
+  // (folded straight into a per-run Map, not merged in via mergeSchemaObservations per line) —
+  // pin the same guarantee here, on the code path that actually owns it today.
+  it.each(['__proto__', 'constructor', 'toString'])(
+    'aggregates two lines whose `type` is the Object.prototype member name %j without crashing or corrupting `types`',
+    async (protoType) => {
+      const firstLine = parsedLine({ type: protoType, version: '2.1.9' }, { lineNumber: 1 });
+      const secondLine = parsedLine({ type: protoType, version: '2.1.10' }, { lineNumber: 2 });
+
+      // Two lines sharing the bucket: the first adopts it as-is (foldBucket's `undefined`
+      // branch), the second must hit the existing-bucket merge branch instead of silently
+      // reading the inherited Object.prototype member as if it were a real bucket.
+      const { model } = await aggregateSchema(toResults([firstLine, secondLine]));
+
+      expect(model.types[protoType].sampleCount).toBe(2);
+      expect(Object.getPrototypeOf(model.types)).toBe(Object.prototype);
+    },
+  );
+});
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — item 2: an MCP server's own tool_use `input`
+// must collapse onto [dynamic-key], but a built-in tool's `input` (Bash, Read, ...) must keep
+// recording its own parameter names, since that can only be judged from the sibling `name`
+// field, not from the `input` key itself.
+describe('aggregateSchema — MCP tool_use input is opaque, built-in tool input is not', () => {
+  function toolUseLine(name: string, input: Record<string, unknown>): Record<string, unknown> {
+    return {
+      type: 'assistant',
+      version: '2.1.11',
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name, input }] },
+    };
+  }
+
+  it('collapses an MCP-minted tool_use block onto message.content.[].input.[dynamic-key]', async () => {
+    const line = parsedLine(toolUseLine('mcp__github__create_issue', { repo_owner: 'acme', repo_name: 'widgets' }));
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.assistant.fields);
+    expect(paths).toContain('message.content.[].input.[dynamic-key]');
+    expect(paths).not.toContain('message.content.[].input.repo_owner');
+    expect(paths).not.toContain('message.content.[].input.repo_name');
+  });
+
+  it("keeps a built-in tool_use block's own parameter names as literal field paths", async () => {
+    const line = parsedLine(toolUseLine('Bash', { command: 'ls', description: 'list files' }));
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.assistant.fields);
+    expect(paths).toContain('message.content.[].input.command');
+    expect(paths).toContain('message.content.[].input.description');
+    expect(paths).not.toContain('message.content.[].input.[dynamic-key]');
+  });
 });

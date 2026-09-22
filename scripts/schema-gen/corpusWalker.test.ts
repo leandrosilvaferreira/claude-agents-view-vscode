@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { walkCorpus, WalkResult, ParseError } from './corpusWalker';
+import { walkCorpus, WalkResult, ParseError, WalkProgress } from './corpusWalker';
 
 function writeLines(filePath: string, lines: string[]): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -84,5 +84,23 @@ describe('walkCorpus', () => {
     const results = await collectResults(missingRoot);
 
     expect(results).toEqual([]);
+  });
+
+  it('reports the file total up front, then running counts per line and per completed file', async () => {
+    writeLines(path.join(scratchRoot, 'a.jsonl'), ['{"type":"user"}', '{"type":"assistant"}']);
+    writeLines(path.join(scratchRoot, 'b.jsonl'), ['not json']);
+
+    const snapshots: WalkProgress[] = [];
+    let resultCount = 0;
+    for await (const _result of walkCorpus(scratchRoot, (progress) => snapshots.push(progress))) {
+      resultCount += 1; // draining the generator is what drives onProgress
+    }
+    expect(resultCount).toBe(3);
+
+    // Fired before any file is opened: the total is already known from the directory listing.
+    expect(snapshots[0]).toEqual({ filesTotal: 2, filesProcessed: 0, entriesProcessed: 0, parseErrorCount: 0 });
+
+    const last = snapshots[snapshots.length - 1];
+    expect(last).toEqual({ filesTotal: 2, filesProcessed: 2, entriesProcessed: 3, parseErrorCount: 1 });
   });
 });

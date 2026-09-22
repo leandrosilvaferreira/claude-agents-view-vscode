@@ -47,6 +47,23 @@ export interface ParseError {
 
 export type WalkResult = ParsedLine | ParseError;
 
+/** Running totals emitted as the walk makes progress, so a caller can render on-the-fly
+ * status for a corpus too large to observe silently (T11's visibility fix). `filesTotal` is
+ * known from the up-front directory listing (cheap — see findJsonlFiles), so it is always
+ * present, unlike the optional `filesTotal` a generic progress consumer might otherwise need
+ * to support. */
+export interface WalkProgress {
+  filesTotal: number;
+  filesProcessed: number;
+  entriesProcessed: number;
+  parseErrorCount: number;
+}
+
+/** Invoked fire-and-forget after every progress update — never awaited, so it must be
+ * synchronous. An async callback that rejects would become an unhandled promise rejection
+ * rather than an error the walk (or its caller) can observe or recover from. */
+export type WalkProgressCallback = (progress: WalkProgress) => void;
+
 const DEFAULT_CORPUS_ROOT = path.join(os.homedir(), '.claude', 'projects');
 const RAW_LINE_SNIPPET_LENGTH = 200;
 
@@ -111,13 +128,41 @@ async function* walkFile(filePath: string): AsyncGenerator<WalkResult> {
  * Never throws: a file that fails to open, or a read stream that errors partway through, is
  * captured as one `ParseError` for that file and the walk moves on to the next one — the
  * same tolerance a single malformed line already gets inside `walkFile`.
+ *
+ * `onProgress`, when given, is called once up front with the file count (before any line is
+ * yielded, since `findJsonlFiles` already paid for that listing) and again after every line
+ * and every completed file — a caller decides on its own throttling/formatting on top (see
+ * progressReporter.ts). Omitted by default, so existing callers (incl. generateFixtures.ts's
+ * own independent walk) are unaffected.
  */
-export async function* walkCorpus(rootDir: string = DEFAULT_CORPUS_ROOT): AsyncGenerator<WalkResult> {
-  for (const filePath of findJsonlFiles(rootDir)) {
+export async function* walkCorpus(
+  rootDir: string = DEFAULT_CORPUS_ROOT,
+  onProgress?: WalkProgressCallback,
+): AsyncGenerator<WalkResult> {
+  const files = findJsonlFiles(rootDir);
+  const filesTotal = files.length;
+  let filesProcessed = 0;
+  let entriesProcessed = 0;
+  let parseErrorCount = 0;
+  onProgress?.({ filesTotal, filesProcessed, entriesProcessed, parseErrorCount });
+
+  for (const filePath of files) {
     try {
-      yield* walkFile(filePath);
+      for await (const result of walkFile(filePath)) {
+        entriesProcessed += 1;
+        if (!result.ok) {
+          parseErrorCount += 1;
+        }
+        yield result;
+        onProgress?.({ filesTotal, filesProcessed, entriesProcessed, parseErrorCount });
+      }
     } catch (error) {
+      entriesProcessed += 1;
+      parseErrorCount += 1;
       yield { ok: false, filePath, lineNumber: 0, rawLine: '', message: describeError(error) };
+      onProgress?.({ filesTotal, filesProcessed, entriesProcessed, parseErrorCount });
     }
+    filesProcessed += 1;
+    onProgress?.({ filesTotal, filesProcessed, entriesProcessed, parseErrorCount });
   }
 }

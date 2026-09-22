@@ -19,19 +19,27 @@ interface NewLinesContext {
   lastReadOffset: number;
   session: Session;
   stats: fs.Stats;
+  seenToolUseIds: Set<string>;
 }
 interface LogLineContext {
   line: string;
   session: Session;
   currentSubagents: Map<string, SubAgent>;
   stats: fs.Stats;
+  seenToolUseIds: Set<string>;
 }
 
 const CLAUDE_CODE_BRAND = 'claude-code' as const;
 
 export class LogParser {
   private codexParser = new CodexLogParser();
-  private cache = new Map<string, { lastReadOffset: number; session: Session }>();
+  // `seenToolUseIds` is subagentDetector.ts's re-appended-line guard (see its own doc comment):
+  // one Set per file, kept here across incremental parses so a launch/SendMessage id already
+  // processed stays skipped no matter how many later parse() calls read further appended chunks.
+  // Reset along with the rest of the cache entry below when the file shrinks (rewritten from
+  // scratch) — a fresh cache entry means a fresh Set, which is correct: ids from the OLD file
+  // content no longer apply.
+  private cache = new Map<string, { lastReadOffset: number; session: Session; seenToolUseIds: Set<string> }>();
   private projectPaths = new ProjectPathResolver();
   private claudeProjectsPath: string;
 
@@ -58,14 +66,21 @@ export class LogParser {
       if (!cacheEntry) {
         const session = this.createEmptySession(filePath, type);
         session.lastInteractionTime = stats.mtimeMs;
-        cacheEntry = { lastReadOffset: 0, session };
+        cacheEntry = { lastReadOffset: 0, session, seenToolUseIds: new Set<string>() };
         this.cache.set(filePath, cacheEntry);
       }
 
-      const { session, lastReadOffset } = cacheEntry;
+      const { session, lastReadOffset, seenToolUseIds } = cacheEntry;
 
       if (fileSize > lastReadOffset) {
-        cacheEntry.lastReadOffset = this.parseNewLines({ filePath, fileSize, lastReadOffset, session, stats });
+        cacheEntry.lastReadOffset = this.parseNewLines({
+          filePath,
+          fileSize,
+          lastReadOffset,
+          session,
+          stats,
+          seenToolUseIds,
+        });
       }
 
       return session;
@@ -76,7 +91,7 @@ export class LogParser {
 
   /** Returns the byte offset the next read should resume from. */
   private parseNewLines(ctx: NewLinesContext): number {
-    const { filePath, fileSize, lastReadOffset, session, stats } = ctx;
+    const { filePath, fileSize, lastReadOffset, session, stats, seenToolUseIds } = ctx;
     const fd = fs.openSync(filePath, 'r');
     const bufferSize = fileSize - lastReadOffset;
     const buffer = Buffer.alloc(bufferSize);
@@ -102,7 +117,7 @@ export class LogParser {
       }
 
       for (const line of lines) {
-        this.parseLogLine({ line, session, currentSubagents, stats });
+        this.parseLogLine({ line, session, currentSubagents, stats, seenToolUseIds });
       }
 
       session.subagents = Array.from(currentSubagents.values());
@@ -121,7 +136,7 @@ export class LogParser {
   }
 
   private parseLogLine(ctx: LogLineContext): void {
-    const { line, session, currentSubagents, stats } = ctx;
+    const { line, session, currentSubagents, stats, seenToolUseIds } = ctx;
     if (!line.trim()) {
       return;
     }
@@ -146,7 +161,7 @@ export class LogParser {
 
       this.detectSessionTitle(json, session);
 
-      detectSubagents(json, currentSubagents);
+      detectSubagents(json, currentSubagents, seenToolUseIds);
     } catch {
       // Ignore JSON parse errors
     }

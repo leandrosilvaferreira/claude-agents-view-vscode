@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isKnownDynamicKeyContainer, isSchemaLikeKey } from './keySafety';
+import { isKnownDynamicKeyContainer, isMcpToolUseInputKey, isSchemaLikeKey } from './keySafety';
 
 describe('isSchemaLikeKey', () => {
   it.each([
@@ -54,15 +54,88 @@ describe('isSchemaLikeKey', () => {
   });
 });
 
-describe('isKnownDynamicKeyContainer', () => {
-  it.each(['answers', 'trackedFileBackups', 'artifacts', '_meta'])(
-    'flags the known dynamic-key-map field %j',
+// Finding C: an opaque id minted fresh per tool call (Claude Code 2.1.270+'s `wireToolInputs` /
+// 2.1.272+'s `wireIngestContext`, both maps keyed by tool_use id) is syntactically a plain
+// identifier and not an Object.prototype member, yet must still be rejected — otherwise every
+// tool call mints ~3 new schema field paths (quadratic schema:generate). A real field name never
+// matches: snake_case has several `_`, and a short tail (e.g. `input_tokens`) both falls below
+// the 16-char body floor AND has no digit for the lookahead to find — either guard alone would
+// already reject it.
+describe('isSchemaLikeKey — opaque per-call ids (Finding C)', () => {
+  it.each([
+    'toolu_01AbCdEfGhIjKlMnOpQrStUv',
+    'srvtoolu_01AbCdEfGhIjKlMnOpQrStUv',
+    'msg_01AbCdEfGhIjKlMnOpQrStUv',
+    // Bedrock/Vertex-routed variants: same id family, with a lowercase infix before the
+    // final `_` + body.
+    'toolu_bdrk_01AbCdEfGhIjKlMnOpQrStUv',
+    'toolu_vrtx_01AbCdEfGhIjKlMnOpQrStUv',
+    'msg_bdrk_01AbCdEfGhIjKlMnOpQrStUv',
+  ])('rejects the opaque id %j', (key) => {
+    expect(isSchemaLikeKey(key)).toBe(false);
+  });
+
+  it.each(['input_tokens', 'cache_read_input_tokens', 'server_tool_use'])(
+    'still accepts the real field name %j',
     (key) => {
-      expect(isKnownDynamicKeyContainer(key)).toBe(true);
+      expect(isSchemaLikeKey(key)).toBe(true);
     },
   );
 
-  it.each(['type', 'message', 'toolUseResult', 'snapshot'])('does not flag an ordinary schema field %j', (key) => {
-    expect(isKnownDynamicKeyContainer(key)).toBe(false);
+  // Guard pins for OPAQUE_ID_KEY's two independent floors — each row trips only one of them,
+  // so a future edit that loosens either floor alone gets caught here.
+  it('accepts a long, digit-free tail — the digit lookahead alone rejects the id shape', () => {
+    expect(isSchemaLikeKey('tool_resultsummarytext')).toBe(true);
+  });
+
+  it('accepts a 15-char body one short of the 16-char floor, even though it has a digit', () => {
+    expect(isSchemaLikeKey('toolu_01AbCdEfGhIjKlM')).toBe(true);
+  });
+});
+
+describe('isKnownDynamicKeyContainer', () => {
+  it.each([
+    'answers',
+    'trackedFileBackups',
+    'artifacts',
+    '_meta',
+    'wireToolInputs',
+    'wireIngestContext',
+    'structuredContent',
+    'properties',
+  ])('flags the known dynamic-key-map or opaque field %j', (key) => {
+    expect(isKnownDynamicKeyContainer(key)).toBe(true);
+  });
+
+  it.each(['type', 'message', 'toolUseResult', 'snapshot', 'input'])(
+    'does not flag an ordinary schema field %j',
+    (key) => {
+      expect(isKnownDynamicKeyContainer(key)).toBe(false);
+    },
+  );
+});
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — same reasoning as the Finding A/B/C blocks.
+describe('isMcpToolUseInputKey', () => {
+  const mcpToolUse = { type: 'tool_use', name: 'mcp__github__create_issue' };
+  const builtinToolUse = { type: 'tool_use', name: 'Bash' };
+
+  it('flags `input` under an MCP-minted tool_use block', () => {
+    expect(isMcpToolUseInputKey(mcpToolUse, 'input')).toBe(true);
+  });
+
+  it('does not flag `input` under a built-in tool_use block', () => {
+    expect(isMcpToolUseInputKey(builtinToolUse, 'input')).toBe(false);
+  });
+
+  it('does not flag a sibling key other than `input`, even under an MCP tool_use block', () => {
+    expect(isMcpToolUseInputKey(mcpToolUse, 'name')).toBe(false);
+    expect(isMcpToolUseInputKey(mcpToolUse, 'id')).toBe(false);
+  });
+
+  it('does not flag `input` when the container is not a tool_use block at all', () => {
+    expect(isMcpToolUseInputKey({ type: 'text', name: 'mcp__github__create_issue' }, 'input')).toBe(false);
+    expect(isMcpToolUseInputKey({ name: 'mcp__github__create_issue' }, 'input')).toBe(false);
   });
 });

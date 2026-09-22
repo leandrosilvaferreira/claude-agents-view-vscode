@@ -53,6 +53,11 @@ export interface LogEntry {
   name?: string;
   id?: string;
   isSidechain?: boolean;
+  // Claude Code marks internal/scaffolding user turns (the slash-command caveat, command
+  // expansions) with isMeta:true. Read today via nameExtractor.ts's own narrower LogEntryForName
+  // view of this same field (extractSessionName skips these turns as titles); declared here too
+  // so LogEntry, the canonical parsed shape, doesn't silently omit a field the pipeline depends on.
+  isMeta?: boolean;
   // Claude Code stamps how the session was launched. Interactive: 'claude-vscode', 'cli'.
   // A background/workflow agent spawned via the SDK carries an 'sdk*' entrypoint.
   entrypoint?: string;
