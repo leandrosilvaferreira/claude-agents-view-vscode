@@ -130,8 +130,9 @@ subagents → dedupe/nest → render tree. All source under `src/`:
 - **sessionScanner.ts** — discovers Claude (`~/.claude/projects/**/*.jsonl`) and
   Antigravity (`~/.gemini/.../transcript.jsonl`) log files. Pure, never throws.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads
-  only appended bytes); builds a `Session`, delegates title, subagent and project-path
-  extraction.
+  only appended bytes, plus a per-file `seenToolUseIds` set carried across those
+  incremental reads — subagentDetector.ts's guard against re-appended history lines);
+  builds a `Session`, delegates title, subagent and project-path extraction.
 - **projectPathResolver.ts** — works out which project a transcript belongs to: Claude
   Code's `cwd` (preferred) or its ambiguous, POSIX-shaped encoded directory name (raw
   name on Windows until `cwd` self-corrects it), Antigravity's prose metadata /
@@ -144,13 +145,22 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   Three Claude launch shapes, only one of which is a `tool_use`: classic `Agent` tool,
   `<forked-skill-launch>` on a `type:"system"` entry (`context: fork` skills like
   `/code-review`), and in-process teammates (grandchildren — deliberately not detected).
+  Skips a launch/SendMessage `tool_use` id already seen earlier in the same file
+  (`seenToolUseIds`/`isReplay`, Claude-only): Claude Code re-appends earlier history lines
+  verbatim (same ids/timestamps) on relocation/resume, and replaying them either resurrected
+  a finished subagent or "resumed" one via a stale SendMessage. Also calls
+  `detectAgentsKilled` (subagentCompletion.ts) on every entry.
   See `.claude/memory/architecture-subagent-dispatch-mechanisms.md`.
 - **subagentCompletion.ts** — the completion half of `subagentDetector` (split out for the
   350-line budget): the launch/resume ACKs that must NOT read as completions
   (`async_launched`, `teammate_spawned`, SendMessage's `resumedAgentId`, a queued-message
   `{success:true, pin}`, or a teammate-inbox send `{success:true, routing}`) plus the three
   real completion shapes — synchronous `tool_result`, `<task-notification>`, and an
-  in-process teammate's `<teammate-message>` `idle_notification`.
+  in-process teammate's `<teammate-message>` `idle_notification`. That same async/teammate
+  ACK (or a `<forked-skill-launch>` at launch) also flags the subagent `isBackground`, which
+  `detectAgentsKilled` uses to stop every still-`working` BACKGROUND subagent on a
+  `system:agents_killed` entry (Claude Code 2.1.258+, no Antigravity equivalent) while
+  leaving a synchronous Agent call — no such ACK exists for it — alone.
 - **sidecarReader.ts** — reads the `agent-<id>.meta.json` sidecars from both candidate
   directories (the transcript's own and the one `projectPath` encodes to — they differ
   inside a worktree), dedupes across them, and caches by filename set so a refresh that

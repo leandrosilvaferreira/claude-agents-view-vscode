@@ -1,13 +1,37 @@
 import { SubAgent } from './types';
 import type { LogEntry } from './logParser';
 import { detectForkedSkillLaunch } from './forkedSkillDetector';
-import { detectCompletions, findSubagentEntryByTarget } from './subagentCompletion';
+import { detectAgentsKilled, detectCompletions, findSubagentEntryByTarget } from './subagentCompletion';
 
-/** Detect subagent starts/completions from one log entry and mutate the running map. */
-export function detectSubagents(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+/**
+ * Detect subagent starts/completions from one log entry and mutate the running map.
+ *
+ * `seenToolUseIds` guards a re-appended transcript line: after a session is relocated or resumed,
+ * Claude Code re-appends earlier history lines verbatim — same tool_use ids, same timestamps
+ * (56,063 such lines across 21 real transcripts, CLI 2.1.239-2.1.276). Replaying an already-
+ * processed launch or SendMessage id must be a no-op, or two things break: a finished subagent's
+ * launch line coming back around resurrects it as 'working' (detectClaudeCalls' unconditional
+ * `set()`), and a re-appended SendMessage that once targeted a still-running agent "resumes" one
+ * that has long since stopped (real: a 2.1.2xx session — launch L3226, mid-run SendMessage L3277,
+ * real completion L3347, both copied again at L4150/L4164). LogParser keeps one Set per file
+ * (see its own cache) across incremental parses and passes it straight through here. A caller that
+ * never shares one Set across repeated calls — every existing direct unit test — sees every id as
+ * new every time, so the dedup silently no-ops and prior behavior is unchanged for them.
+ *
+ * Claude-only: Antigravity has no equivalent re-append behavior on record, and its own
+ * re-invocation of a tool call already flips the matching id back to 'working' via
+ * detectAntigravityCalls' unconditional `set()`, which is correct there (see
+ * detectSendMessageResume's own note on why Antigravity needs no SendMessage equivalent either).
+ */
+export function detectSubagents(
+  json: LogEntry,
+  currentSubagents: Map<string, SubAgent>,
+  seenToolUseIds = new Set<string>(),
+): void {
   detectAntigravityCalls(json, currentSubagents);
-  detectClaudeCalls(json, currentSubagents);
-  detectSendMessageResume(json, currentSubagents);
+  detectClaudeCalls(json, currentSubagents, seenToolUseIds);
+  detectSendMessageResume(json, currentSubagents, seenToolUseIds);
+  detectAgentsKilled(json, currentSubagents);
   detectClaudeStandaloneCalls(json, currentSubagents);
   detectForkedSkillLaunch(json, currentSubagents);
   detectCompletions(json, currentSubagents);
@@ -47,10 +71,10 @@ function getAntigravityName(tc: { name?: string; ToolName?: string }): string {
   return tc.name || tc.ToolName || 'subagent';
 }
 
-function detectClaudeCalls(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+function detectClaudeCalls(json: LogEntry, currentSubagents: Map<string, SubAgent>, seen: Set<string>): void {
   if (json.message && Array.isArray(json.message.content)) {
     for (const block of json.message.content) {
-      if (isClaudeAgentTool(block)) {
+      if (isClaudeAgentTool(block) && !markSeen(block.id, seen)) {
         const id = block.id || Math.random().toString();
         currentSubagents.set(id, {
           id,
@@ -111,10 +135,10 @@ function getClaudeModel(block: { input?: { model?: string } }): string | undefin
  * re-invocation of an existing tool call already flips the matching id back to 'working' via
  * detectAntigravityCalls's unconditional `set()`.
  */
-function detectSendMessageResume(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+function detectSendMessageResume(json: LogEntry, currentSubagents: Map<string, SubAgent>, seen: Set<string>): void {
   if (json.message && Array.isArray(json.message.content)) {
     for (const block of json.message.content) {
-      if (!isSendMessageCall(block) || !block.id) {
+      if (!isSendMessageCall(block) || !block.id || markSeen(block.id, seen)) {
         continue;
       }
       const to = getSendMessageTarget(block);
@@ -135,7 +159,12 @@ function detectSendMessageResume(json: LogEntry, currentSubagents: Map<string, S
   }
 }
 
-/** Re-keys the map entry to the SendMessage's own tool_use id and flips it back to 'working'.
+/** Re-keys the map entry to the SendMessage's own tool_use id, flips it back to 'working', and
+ * flags it backgrounded: Claude Code always resumes a finished subagent in the background, even
+ * one originally launched synchronously (133 of 347 real resumes target a sync-launched agent, all
+ * completing via <task-notification> — see types.ts's `isBackground` doc comment). Without this,
+ * `agents_killed` (subagentCompletion.ts's detectAgentsKilled) can never reach a resumed
+ * synchronous agent — rewake can't recover it either, since `stoppedAt` is cleared right below.
  * `launchId` is set once — on the FIRST resume only, when it's still unset — so a later resume
  * never overwrites the original launch id it needs to keep pointing at (see
  * detectSendMessageResume's doc comment on why that id must survive the rekey). */
@@ -146,9 +175,27 @@ function reactivateSubagent(currentSubagents: Map<string, SubAgent>, entry: [str
     sub.launchId = oldId;
   }
   sub.status = 'working';
+  sub.isBackground = true;
   sub.stoppedAt = undefined;
   sub.id = newId;
   currentSubagents.set(newId, sub);
+}
+
+/** Marks this launch/resume tool_use id as seen, returning whether it already was — see
+ * detectSubagents' own doc comment for why a re-appended history line needs this. Marks the id on
+ * first sight, so every later replay of the SAME id is skipped too, not just the first one. An
+ * id-less block (`block.id` undefined) is never treated as already seen — there is nothing to key
+ * the dedup on, same as detectClaudeCalls' own `Math.random()` fallback already accepts for that
+ * case. */
+function markSeen(id: string | undefined, seen: Set<string>): boolean {
+  if (!id) {
+    return false;
+  }
+  if (seen.has(id)) {
+    return true;
+  }
+  seen.add(id);
+  return false;
 }
 
 function isSendMessageCall(block: { type: string; name?: string }): boolean {

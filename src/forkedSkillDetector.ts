@@ -35,6 +35,10 @@ export function detectForkedSkillLaunch(json: LogEntry, currentSubagents: Map<st
     name: payload.skillName || 'Agent',
     task: payload.description || 'Delegate task',
     status: 'working',
+    // A forked skill always runs backgrounded (see this function's own doc comment) — feeds
+    // subagentCompletion.ts's detectAgentsKilled, which must leave a still-running SYNCHRONOUS
+    // Agent call alone when an `agents_killed` kill signal only ever targets background agents.
+    isBackground: true,
   });
 }
 

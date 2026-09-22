@@ -14,6 +14,10 @@
 
 - [Parent-side completion is not final](architecture-parent-completion-not-final.md) — queued-SendMessage ACK `{success,pin}` (no `resumedAgentId`) + post-`<task-notification>` re-wake; test cold parse AND line-by-line replay.
 
+- [Old lines re-appended after resume](architecture-transcript-lines-reappended-after-resume.md) — same uuid/tool ids re-written after relocate/resume; detectors must skip already-seen ids (`isReplay`).
+
+- [CLI binary holds transcript writers](reference-claude-cli-binary-has-transcript-writers.md) — `~/.local/share/claude/versions/<v>`; grep it to decode a new entry subtype (e.g. `agents_killed`).
+
 - [Subagent transcript layout on disk](reference-transcript-subagent-layout.md) — subagents live in `<session-id>/subagents/agent-*.jsonl`; `scanClaudeSubSessions` looks in a `sessions/` dir that never exists; native worktree-entry leaves a same-id stub that can collide (fixed via `upsertIfMoreRelevant`); worktree-dir sidecar loss after cwd reverts to base — fixed on `fix/subagent-visibility-gaps`.
 
 - [Enrichment runs on parse, nesting on the tick](architecture-enrichment-runs-only-on-parse-not-tick.md) — `enrichSubagentMetadata` (fills `agentId`) only ran when the parent transcript grew, leaving grandchildren unattached for a subagent's whole live run — fixed on `fix/subagent-visibility-gaps`.

@@ -36,6 +36,11 @@ export function detectCompletions(json: LogEntry, currentSubagents: Map<string, 
   // doc comment for why this can't wait for the sidecar join instead).
   recordResultAgentId(json, currentSubagents);
 
+  // Same shape as recordResultAgentId above: called unconditionally, before anything below can
+  // return early. markBackground no-ops on anything that isn't actually an async-launch/teammate
+  // ACK (see its own doc comment), so this adds no branch here.
+  markBackground(json, currentSubagents);
+
   // A backgrounded Agent gets its tool_result ~100ms after launch, carrying
   // toolUseResult.status === 'async_launched'. That ACKs the launch — it does NOT mean the agent
   // finished (observed: an agent ACKed at 17:58:09 only really finished at 18:07:06). Counting it
@@ -74,6 +79,37 @@ export function detectCompletions(json: LogEntry, currentSubagents: Map<string, 
 
   detectTaskNotificationCompletion(json, currentSubagents);
   detectTeammateIdleCompletion(json, currentSubagents);
+}
+
+/**
+ * `system:agents_killed` (Claude Code 2.1.258+, observed carrying only type/subtype/timestamp —
+ * no per-agent ids at all): written once when the user stops every BACKGROUND agent at once (e.g.
+ * ctrl+x ctrl+k twice, "All background agents stopped"). No per-agent <task-notification> follows
+ * for any of them, so a background subagent/teammate with no completion of its own would otherwise
+ * stay 'working' forever and keep the whole session reading 'working' too (real: session
+ * f03a74fb, 2.1.258 — a teammate launched around L464 never got its own completion; the kill line
+ * lands around L1644).
+ *
+ * Scoped to `sub.isBackground` (set by markBackground above, at launch for a
+ * `<forked-skill-launch>` — see forkedSkillDetector.ts — or by reactivateSubagent on a
+ * SendMessage resume, in subagentDetector.ts): a synchronous/foreground Agent call blocks the
+ * whole turn until its own tool_result, so it can't itself be background, and must stay 'working'
+ * — the user's kill command only ever targets backgrounded agents in the first place. `SubAgent`
+ * has no other way to tell the two apart today, hence the flag.
+ *
+ * Claude-only: this entry type has no Antigravity equivalent, so the `type`/`subtype` gate below
+ * simply never matches an Antigravity transcript — no separate no-op branch is needed.
+ */
+export function detectAgentsKilled(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+  if (json.type !== 'system' || json.subtype !== 'agents_killed') {
+    return;
+  }
+  const at = entryTime(json);
+  for (const sub of currentSubagents.values()) {
+    if (sub.status === 'working' && sub.isBackground) {
+      stop(sub, at);
+    }
+  }
 }
 
 /**
@@ -131,8 +167,34 @@ function recordResultAgentId(json: LogEntry, currentSubagents: Map<string, SubAg
   }
 }
 
+/** True for either ACK shape that must NOT be read as a completion: an async-launch/teammate ACK
+ * or a SendMessage-ack (which ACKs a MESSAGE, not a launch — see isSendMessageAck's own doc
+ * comment). Pure predicate — background-ness is recorded separately by markBackground, called
+ * unconditionally from detectCompletions above, not as a side effect of this check. */
 function isLaunchOrSendMessageAck(json: LogEntry): boolean {
   return isAsyncLaunchAck(json) || isSendMessageAck(json);
+}
+
+/** Flags the subagent this async-launch/teammate ACK targets as backgrounded — same
+ * message.content walk as recordResultAgentId above, keyed by the ACK's own tool_use_id. Checks
+ * isAsyncLaunchAck itself (rather than relying on the caller to gate it) so detectCompletions can
+ * call it unconditionally without gaining a branch; in particular this is NOT true for a
+ * SendMessage-ack, which acks a MESSAGE, not a launch. detectAgentsKilled (below) relies on this
+ * flag to tell a backgrounded agent apart from a synchronous Agent call, which gets no ACK of
+ * either shape until it completes — a synchronous call later RESUMED via SendMessage becomes
+ * background too, but through reactivateSubagent in subagentDetector.ts, not here. */
+function markBackground(json: LogEntry, currentSubagents: Map<string, SubAgent>): void {
+  if (!isAsyncLaunchAck(json) || !json.message || !Array.isArray(json.message.content)) {
+    return;
+  }
+  for (const block of json.message.content) {
+    if (block.type === 'tool_result' && block.tool_use_id) {
+      const sub = currentSubagents.get(block.tool_use_id);
+      if (sub) {
+        sub.isBackground = true;
+      }
+    }
+  }
 }
 
 function isAsyncLaunchAck(json: LogEntry): boolean {
