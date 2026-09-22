@@ -158,3 +158,93 @@ describe('sanitizeBaseline — Object.prototype member names stay safe', () => {
     },
   );
 });
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — item 2: `properties` now shares the same
+// opaque-container set as `structuredContent` (keySafety.ts's OPAQUE_KEY_CONTAINERS), so a
+// legacy JSON-Schema properties path collapses the same way. The MCP tool_use `input` rule still
+// can't be re-applied from the path alone (a flattened path has no sibling `name` left to
+// consult) — but `sanitizeBaseline` now also takes the fresh run's own model and reconciles
+// against it (reconcileToolUseInputPath in sanitizeBaseline.ts) instead of leaving every such
+// path exactly as committed forever.
+describe('sanitizeBaseline — OPAQUE_KEY_CONTAINERS (item 2)', () => {
+  it('collapses a legacy JSON-Schema properties child the same way as a dynamic-key container', () => {
+    const baseline = makeModel({
+      types: {
+        user: makeTypeObservation({
+          fields: { 'attachment.tools.[].schema.input_schema.properties.repo_owner': makeField() },
+        }),
+      },
+    });
+
+    const sanitized = sanitizeBaseline(baseline);
+
+    const fields = sanitized.types.user.fields;
+    expect(fields['attachment.tools.[].schema.input_schema.properties.[dynamic-key]']).toBeDefined();
+    expect(fields['attachment.tools.[].schema.input_schema.properties.repo_owner']).toBeUndefined();
+  });
+});
+
+// Sibling top-level describe (not nested above) — item 2 continued: reconciling a legacy
+// `message.content.[].input.*` path against the fresh run's own model (see
+// reconcileToolUseInputPath in sanitizeBaseline.ts). Replaces the old "leaves it exactly as
+// committed" test, which locked in the gap this fix closes.
+describe('sanitizeBaseline — reconciles message.content.[].input.* against the fresh run (item 2)', () => {
+  it('collapses a legacy input path the fresh run did not re-observe (a leaked MCP parameter, now collapsed at observation time)', () => {
+    const path = 'message.content.[].input.repo_owner';
+    const baseline = makeModel({
+      types: { assistant: makeTypeObservation({ fields: { [path]: makeField({ presentCount: 3 }) } }) },
+    });
+
+    const sanitized = sanitizeBaseline(baseline, createEmptyModel());
+
+    const fields = sanitized.types.assistant.fields;
+    expect(fields['message.content.[].input.[dynamic-key]']).toEqual(makeField({ presentCount: 3 }));
+    expect(fields[path]).toBeUndefined();
+  });
+
+  it('keeps a legacy input path literal when the fresh run re-observed that exact built-in-tool path (e.g. Bash `command`)', () => {
+    const path = 'message.content.[].input.command';
+    const baseline = makeModel({
+      types: { assistant: makeTypeObservation({ fields: { [path]: makeField({ presentCount: 9 }) } }) },
+    });
+    const freshRun = makeModel({
+      types: { assistant: makeTypeObservation({ fields: { [path]: makeField({ presentCount: 1 }) } }) },
+    });
+
+    const sanitized = sanitizeBaseline(baseline, freshRun);
+
+    expect(sanitized.types.assistant.fields[path]).toEqual(makeField({ presentCount: 9 }));
+  });
+
+  it('merges two legacy input paths that both collapse onto [dynamic-key] instead of overwriting one with the other', () => {
+    const baseline = makeModel({
+      types: {
+        assistant: makeTypeObservation({
+          fields: {
+            'message.content.[].input.repo_owner': makeField({ presentCount: 2 }),
+            'message.content.[].input.libraryName': makeField({ presentCount: 3 }),
+          },
+        }),
+      },
+    });
+
+    const sanitized = sanitizeBaseline(baseline, createEmptyModel());
+
+    const fields = sanitized.types.assistant.fields;
+    expect(Object.keys(fields)).toEqual(['message.content.[].input.[dynamic-key]']);
+    expect(fields['message.content.[].input.[dynamic-key]'].presentCount).toBe(5);
+  });
+
+  it('defaults to an empty fresh run when none is passed, collapsing a legacy input path conservatively', () => {
+    const path = 'message.content.[].input.section_identifier';
+    const baseline = makeModel({
+      types: { assistant: makeTypeObservation({ fields: { [path]: makeField() } }) },
+    });
+
+    const sanitized = sanitizeBaseline(baseline);
+
+    expect(sanitized.types.assistant.fields['message.content.[].input.[dynamic-key]']).toBeDefined();
+    expect(sanitized.types.assistant.fields[path]).toBeUndefined();
+  });
+});

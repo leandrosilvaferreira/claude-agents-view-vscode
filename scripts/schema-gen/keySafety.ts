@@ -10,7 +10,7 @@
  * that shape (and any future field with the same problem) before a key's own text — not just
  * its value — ends up in a generated artifact.
  *
- * Three known gaps in judging a key by shape alone, all closed by what's below:
+ * Four known gaps in judging a key by shape alone, all closed by what's below:
  *  - A key can look like a plain identifier (pass `SCHEMA_LIKE_KEY`) yet still be an inherited
  *    `Object.prototype` member name (`constructor`, `toString`, `__proto__`, ...) — dangerous
  *    downstream via `key in obj`/`obj[key]` reads and writes. `isSchemaLikeKey` itself rejects
@@ -27,7 +27,15 @@
  *    that's known to be a dynamic-key map rather than a fixed schema. `isSchemaLikeKey` can't
  *    detect this by shape at all; callers must additionally check the key's *container* via
  *    `isKnownDynamicKeyContainer` before trusting any of its children. See
- *    `KNOWN_DYNAMIC_KEY_CONTAINERS`.
+ *    `KNOWN_DYNAMIC_KEY_CONTAINERS` and `OPAQUE_KEY_CONTAINERS`.
+ *  - A key can be a normal, safe, widely-shared field name (`input`) whose value is only
+ *    untrusted third-party content *sometimes* — depending on a SIBLING field's value, not on
+ *    the key or its container at all. A `message.content[]` block's `input` holds a built-in
+ *    tool's own well-known parameters (Bash's `command`, Read's `file_path`) when `name` is a
+ *    built-in tool, but an MCP server's own arbitrary parameter names when `name` was minted by
+ *    that server (`mcp__<server>__<tool>`). Neither `isSchemaLikeKey` nor
+ *    `isKnownDynamicKeyContainer` can see a sibling field, so this needs its own check; see
+ *    `isMcpToolUseInputKey`.
  */
 
 /**
@@ -74,25 +82,73 @@ export function isSchemaLikeKey(key: string): boolean {
 }
 
 /**
- * Field names whose *value* is known to be a map keyed by arbitrary content — not a fixed
- * set of schema field names — even though an individual key inside it can still look like a
- * plain identifier and pass `isSchemaLikeKey` above (a short, punctuation-free real value:
- * a tracked filename like `LICENSE`, a bare-word answer label, ...). `isSchemaLikeKey` only
- * judges a key's *shape*; it has no way to know a key came from one of these containers, so
- * the walker/redactor must check this list themselves before trusting any child key of one
- * of these fields. Deliberately a small, explicit, easy-to-extend list, not a claim of
- * completeness — grow it as new dynamic-key-map fields are found in the real corpus.
+ * Field names whose *value* is known to be a map keyed by arbitrary CONTENT — a literal
+ * question, a tracked filename, an artifact id/name — not a fixed set of schema field names,
+ * even though an individual key inside it can still look like a plain identifier and pass
+ * `isSchemaLikeKey` above (a short, punctuation-free real value: a tracked filename like
+ * `LICENSE`, a bare-word answer label, ...). `isSchemaLikeKey` only judges a key's *shape*; it
+ * has no way to know a key came from one of these containers, so the walker/redactor must check
+ * this (via `isKnownDynamicKeyContainer`, which also covers `OPAQUE_KEY_CONTAINERS` below)
+ * themselves before trusting any child key of one of these fields. Deliberately a small,
+ * explicit, easy-to-extend list, not a claim of completeness — grow it as new dynamic-key-map
+ * fields are found in the real corpus.
  */
 export const KNOWN_DYNAMIC_KEY_CONTAINERS: ReadonlySet<string> = new Set([
   'answers', // toolUseResult.answers — AskUserQuestion's answer map, keyed by question text
   'trackedFileBackups', // snapshot.trackedFileBackups — keyed by the real tracked filename
   'artifacts', // keyed by an artifact id/name
   '_meta', // mcpMeta._meta — MCP metadata map, keyed by arbitrary MCP-defined keys
-  'wireToolInputs', // assistant.wireToolInputs — CLI 2.1.270+, keyed by tool_use id
-  'wireIngestContext', // assistant.wireIngestContext — CLI 2.1.272+, keyed by tool_use id
-  'structuredContent', // user.mcpMeta.structuredContent — keyed by field names a third-party MCP server defines
+]);
+
+/**
+ * Field names whose value is OPAQUE at every depth, not just its own direct children — an
+ * id-keyed or third-party-schema-keyed subtree where everything nested inside is untrusted,
+ * arbitrarily deep content the caller must never assume any structure for:
+ *  - `wireToolInputs` / `wireIngestContext` — maps keyed by tool_use id, whose value is that
+ *    tool's own, arbitrarily shaped input object (Claude Code 2.1.270+/2.1.272+).
+ *  - `structuredContent` — an MCP server's own result shape (`user.mcpMeta.structuredContent`).
+ *  - `properties` — a JSON-Schema properties map (`attachment.tools[].schema.input_schema.
+ *    properties`, `attachment.entries[].input_schema.properties`): keyed by a tool's own
+ *    parameter names, which can nest ANOTHER `properties` map for an object-typed parameter.
+ *    Verified against the real corpus (5,874 files / ~1.67M lines, 2026-09-21): every
+ *    `properties` object found lives at one of those two paths and is either empty or matches a
+ *    JSON-Schema property-definition shape (`type`/`description`/`enum`/`items`/`anyOf`/
+ *    `oneOf`) — no other use of a `properties` key exists in the scanned corpus.
+ *
+ * Mechanically this feeds the exact same `isKnownDynamicKeyContainer` check as
+ * `KNOWN_DYNAMIC_KEY_CONTAINERS` above (the walker never recurses past a collapsed key either
+ * way, so both already fully collapse in practice) — kept as its own, explicitly-named set so
+ * the "opaque at every depth" guarantee for third-party-schema fields is documented and
+ * reviewable on its own, not an incidental side effect of the walker's non-recursion.
+ */
+export const OPAQUE_KEY_CONTAINERS: ReadonlySet<string> = new Set([
+  'wireToolInputs',
+  'wireIngestContext',
+  'structuredContent',
+  'properties',
 ]);
 
 export function isKnownDynamicKeyContainer(key: string): boolean {
-  return KNOWN_DYNAMIC_KEY_CONTAINERS.has(key);
+  return KNOWN_DYNAMIC_KEY_CONTAINERS.has(key) || OPAQUE_KEY_CONTAINERS.has(key);
+}
+
+const MCP_TOOL_NAME_PREFIX = 'mcp__';
+
+/**
+ * True when `container` is a `message.content[]` tool_use block whose `name` was minted by an
+ * MCP server, and `key` is that block's `input` field. An MCP server defines its own tool
+ * parameter names — exactly as untrusted/third-party as `structuredContent`'s fields — but
+ * `input` is an ordinary field name every tool_use block has, including a BUILT-IN tool's
+ * (Bash's `command`, Read's `file_path`), whose own parameter names must keep recording
+ * normally. That makes this judgeable only from a SIBLING field's value (`type`/`name`), never
+ * from `key`'s own name or shape the way `isKnownDynamicKeyContainer`/`isSchemaLikeKey` above
+ * can — so callers pass the object `key` was read from as `container` alongside `key` itself.
+ */
+export function isMcpToolUseInputKey(container: Record<string, unknown>, key: string): boolean {
+  return (
+    key === 'input' &&
+    container.type === 'tool_use' &&
+    typeof container.name === 'string' &&
+    container.name.startsWith(MCP_TOOL_NAME_PREFIX)
+  );
 }

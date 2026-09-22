@@ -1,5 +1,5 @@
 import { ParseError, WalkResult } from './corpusWalker';
-import { isKnownDynamicKeyContainer, isSchemaLikeKey } from './keySafety';
+import { isKnownDynamicKeyContainer, isMcpToolUseInputKey, isSchemaLikeKey } from './keySafety';
 import {
   compareVersions,
   mergeFieldObservation,
@@ -34,11 +34,17 @@ import {
  * text) collapses onto one trailing `[dynamic-key]` segment instead of leaking its literal text
  * into the path; recursion also stops there, since nothing under an unsafe key can be assumed to
  * be normal structure. A fourth safeguard covers a key that *looks* safe but isn't: every child
- * of a known dynamic-key-map container field (keySafety.ts's `KNOWN_DYNAMIC_KEY_CONTAINERS` —
- * `answers`, `trackedFileBackups`, `artifacts`, `_meta`, `wireToolInputs`, `wireIngestContext`,
- * `structuredContent`) collapses the same way regardless of its own shape, since a short,
- * punctuation-free real value (a tracked filename, a bare-word answer) would otherwise pass the
- * identifier check and leak through anyway.
+ * of a known dynamic-key-map or opaque container field (keySafety.ts's
+ * `KNOWN_DYNAMIC_KEY_CONTAINERS`/`OPAQUE_KEY_CONTAINERS`, both fed through the same
+ * `isKnownDynamicKeyContainer` check — `answers`, `trackedFileBackups`, `artifacts`, `_meta`,
+ * `wireToolInputs`, `wireIngestContext`, `structuredContent`, `properties`) collapses the same
+ * way regardless of its own shape, since a short, punctuation-free real value (a tracked
+ * filename, a bare-word answer, a third-party tool's own parameter name) would otherwise pass
+ * the identifier check and leak through anyway. A fifth, context-dependent safeguard
+ * (`isMcpToolUseInputKey`) covers a `message.content[]` tool_use block's `input` field
+ * specifically when `name` was minted by an MCP server — that can't be judged from the key
+ * alone (a built-in tool's `input` must keep recording its own parameter names normally), only
+ * from the sibling `type`/`name` fields on the same object.
  */
 
 /** Top-level fields are depth 1; nesting stops recording once a path reaches this depth. */
@@ -183,7 +189,10 @@ function walkValue(value: unknown, ctx: WalkContext, fields: Map<string, FieldOb
           path: `${ctx.path}.${key}`,
           depth: ctx.depth + 1,
           version: ctx.version,
-          forceDynamicKey: isKnownDynamicKeyContainer(key),
+          // `value` here is the CURRENT object being iterated — the container itself for the
+          // static name check, and the tool_use block for the MCP sibling-context check (see
+          // isMcpToolUseInputKey's own doc comment for why that one needs the container).
+          forceDynamicKey: isKnownDynamicKeyContainer(key) || isMcpToolUseInputKey(value, key),
         },
         fields,
       );

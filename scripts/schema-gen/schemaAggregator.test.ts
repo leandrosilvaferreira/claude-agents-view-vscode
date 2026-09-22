@@ -197,6 +197,7 @@ describe('aggregateSchema — known dynamic-key containers (Finding B)', () => {
     'wireToolInputs',
     'wireIngestContext',
     'structuredContent',
+    'properties',
   ])(
     'collapses a bare, identifier-shaped child key under the known dynamic-key container %j onto [dynamic-key]',
     async (containerKey) => {
@@ -264,4 +265,41 @@ describe('aggregateSchema — Object.prototype member name as a top-level `type`
       expect(Object.getPrototypeOf(model.types)).toBe(Object.prototype);
     },
   );
+});
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — item 2: an MCP server's own tool_use `input`
+// must collapse onto [dynamic-key], but a built-in tool's `input` (Bash, Read, ...) must keep
+// recording its own parameter names, since that can only be judged from the sibling `name`
+// field, not from the `input` key itself.
+describe('aggregateSchema — MCP tool_use input is opaque, built-in tool input is not', () => {
+  function toolUseLine(name: string, input: Record<string, unknown>): Record<string, unknown> {
+    return {
+      type: 'assistant',
+      version: '2.1.11',
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name, input }] },
+    };
+  }
+
+  it('collapses an MCP-minted tool_use block onto message.content.[].input.[dynamic-key]', async () => {
+    const line = parsedLine(toolUseLine('mcp__github__create_issue', { repo_owner: 'acme', repo_name: 'widgets' }));
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.assistant.fields);
+    expect(paths).toContain('message.content.[].input.[dynamic-key]');
+    expect(paths).not.toContain('message.content.[].input.repo_owner');
+    expect(paths).not.toContain('message.content.[].input.repo_name');
+  });
+
+  it("keeps a built-in tool_use block's own parameter names as literal field paths", async () => {
+    const line = parsedLine(toolUseLine('Bash', { command: 'ls', description: 'list files' }));
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.assistant.fields);
+    expect(paths).toContain('message.content.[].input.command');
+    expect(paths).toContain('message.content.[].input.description');
+    expect(paths).not.toContain('message.content.[].input.[dynamic-key]');
+  });
 });

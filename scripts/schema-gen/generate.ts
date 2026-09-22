@@ -140,14 +140,17 @@ function printReport(parseErrorCount: number, undocumentedFields: string[]): voi
  * The loaded baseline is re-sanitized (sanitizeBaseline.ts) before the merge, not after:
  * mergeSchemaObservations is additive-only, so a literal path that leaked into a past commit
  * (e.g. before a container was added to KNOWN_DYNAMIC_KEY_CONTAINERS) would otherwise survive
- * every future merge forever — sanitizing the incoming `runModel` alone can't reach it. */
+ * every future merge forever — sanitizing the incoming `runModel` alone can't reach it. `runModel`
+ * is also passed into `sanitizeBaseline` itself (not just merged after it): reconciling a legacy
+ * `message.content.[].input.*` path needs this exact run's own fresh observations, not just the
+ * rules a bare committed path can judge on its own (see sanitizeBaseline.ts's doc comment). */
 function mergeAndSaveObservations(
   resolved: ResolvedOptions,
   runModel: SchemaObservationModel,
   reporter: ProgressReporter,
 ): SchemaObservationModel {
   reporter.phase('aggregating and finalizing observations');
-  const existing = sanitizeBaseline(loadSchemaObservations(resolved.observationsPath));
+  const existing = sanitizeBaseline(loadSchemaObservations(resolved.observationsPath), runModel);
   const merged = mergeSchemaObservations(existing, runModel);
   const stamped: SchemaObservationModel = { ...merged, generatedAt: new Date().toISOString() };
 

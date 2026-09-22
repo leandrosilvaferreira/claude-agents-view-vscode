@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isKnownDynamicKeyContainer, isSchemaLikeKey } from './keySafety';
+import { isKnownDynamicKeyContainer, isMcpToolUseInputKey, isSchemaLikeKey } from './keySafety';
 
 describe('isSchemaLikeKey', () => {
   it.each([
@@ -102,11 +102,40 @@ describe('isKnownDynamicKeyContainer', () => {
     'wireToolInputs',
     'wireIngestContext',
     'structuredContent',
-  ])('flags the known dynamic-key-map field %j', (key) => {
+    'properties',
+  ])('flags the known dynamic-key-map or opaque field %j', (key) => {
     expect(isKnownDynamicKeyContainer(key)).toBe(true);
   });
 
-  it.each(['type', 'message', 'toolUseResult', 'snapshot'])('does not flag an ordinary schema field %j', (key) => {
-    expect(isKnownDynamicKeyContainer(key)).toBe(false);
+  it.each(['type', 'message', 'toolUseResult', 'snapshot', 'input'])(
+    'does not flag an ordinary schema field %j',
+    (key) => {
+      expect(isKnownDynamicKeyContainer(key)).toBe(false);
+    },
+  );
+});
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — same reasoning as the Finding A/B/C blocks.
+describe('isMcpToolUseInputKey', () => {
+  const mcpToolUse = { type: 'tool_use', name: 'mcp__github__create_issue' };
+  const builtinToolUse = { type: 'tool_use', name: 'Bash' };
+
+  it('flags `input` under an MCP-minted tool_use block', () => {
+    expect(isMcpToolUseInputKey(mcpToolUse, 'input')).toBe(true);
+  });
+
+  it('does not flag `input` under a built-in tool_use block', () => {
+    expect(isMcpToolUseInputKey(builtinToolUse, 'input')).toBe(false);
+  });
+
+  it('does not flag a sibling key other than `input`, even under an MCP tool_use block', () => {
+    expect(isMcpToolUseInputKey(mcpToolUse, 'name')).toBe(false);
+    expect(isMcpToolUseInputKey(mcpToolUse, 'id')).toBe(false);
+  });
+
+  it('does not flag `input` when the container is not a tool_use block at all', () => {
+    expect(isMcpToolUseInputKey({ type: 'text', name: 'mcp__github__create_issue' }, 'input')).toBe(false);
+    expect(isMcpToolUseInputKey({ name: 'mcp__github__create_issue' }, 'input')).toBe(false);
   });
 });

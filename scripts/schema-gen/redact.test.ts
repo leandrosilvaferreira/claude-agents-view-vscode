@@ -130,6 +130,7 @@ describe('redact', () => {
     'wireToolInputs',
     'wireIngestContext',
     'structuredContent',
+    'properties',
   ])(
     'redacts a bare, identifier-shaped child key under the known dynamic-key container %j instead of keeping it literally',
     (containerKey) => {
@@ -180,5 +181,169 @@ describe('redact — opaque per-call ids (Finding C)', () => {
 
     expect(serialized).not.toContain('toolu_01AbCdEfGhIjKlMnOpQrStUv');
     expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+  });
+});
+
+// Sibling top-level describe (not nested above) so its line count doesn't push that describe
+// past this repo's max-lines-per-function limit — same reasoning as the other sibling describes
+// in this file. Item 1 (BLOCKING): numeric leaves must default-deny exactly like string leaves.
+describe('redact — numeric leaves default-deny like strings (item 1)', () => {
+  it('replaces every numeric leaf in a cost-state-like entry with 0', () => {
+    const line = {
+      type: 'system',
+      subtype: 'cost-state',
+      totalCostUSD: 12.34,
+      startTime: 1732000000000,
+      totalDuration: 4567,
+      totalAPIDuration: 1234,
+      totalAPIDurationWithoutRetries: 1000,
+      totalToolDuration: 200,
+    };
+
+    const result = redact(line);
+
+    expect(result.totalCostUSD).toBe(0);
+    expect(result.startTime).toBe(0);
+    expect(result.totalDuration).toBe(0);
+    expect(result.totalAPIDuration).toBe(0);
+    expect(result.totalAPIDurationWithoutRetries).toBe(0);
+    expect(result.totalToolDuration).toBe(0);
+  });
+
+  it('replaces a real PR number in a pr-link-like entry with 0', () => {
+    const line = { type: 'pr-link', prNumber: 4821 };
+
+    const result = redact(line);
+
+    expect(result.prNumber).toBe(0);
+  });
+
+  it('keeps `created` literal — the one numeric field the extension parser actually reads', () => {
+    const line = { type: 'user', created: 1732000000000 };
+
+    expect(redact(line).created).toBe(1732000000000);
+  });
+
+  it('zeroes a `created` field nested inside echoed third-party tool output instead of keeping it like the top-level one', () => {
+    const line = { type: 'tool_result', toolUseResult: { status: 'success', record: { created: 1700000000 } } };
+
+    expect(redact(line).toolUseResult.record.created).toBe(0);
+  });
+
+  it('leaves booleans and null unchanged', () => {
+    const line = { type: 'user', isSidechain: true, isAsync: false, resolvedModel: null };
+
+    const result = redact(line);
+
+    expect(result.isSidechain).toBe(true);
+    expect(result.isAsync).toBe(false);
+    expect(result.resolvedModel).toBeNull();
+  });
+});
+
+// Sibling top-level describe (not nested above) — item 3: a kept type/role/status value must
+// also match a closed-vocabulary shape, not just have an allowlisted key.
+describe('redact — closed-vocabulary guard for allowlisted keys (item 3)', () => {
+  it('redacts a long free-text value found under an allowlisted key like `status`', () => {
+    const line = {
+      type: 'system',
+      toolUseResult: { status: 'This deployment requires manual approval before it can proceed today' },
+    };
+
+    const result = redact(line);
+
+    expect(result.toolUseResult.status).toMatch(PLACEHOLDER);
+  });
+
+  it('still keeps a short, real closed-vocabulary status value literal', () => {
+    const line = { type: 'system', toolUseResult: { status: 'async_launched' } };
+
+    expect(redact(line).toolUseResult.status).toBe('async_launched');
+  });
+
+  // Widened regex: memory-file types are PascalCase, a MIME type has a `/` (see CLOSED_VOCABULARY_VALUE).
+  it.each(['AutoMem', 'image/png'])(
+    'keeps the real closed-vocabulary value %j literal under an allowlisted key',
+    (value) => {
+      const line = { type: value };
+
+      expect(redact(line).type).toBe(value);
+    },
+  );
+
+  // Item 4: `subtype` wasn't allowlisted, so every `system:*` fixture lost its real subtype.
+  it('keeps a real subtype value literal instead of redacting it to a placeholder (item 4)', () => {
+    const line = { type: 'system', subtype: 'agents_killed' };
+
+    expect(redact(line).subtype).toBe('agents_killed');
+  });
+});
+
+// Sibling top-level describe (not nested above) — item 2: an opaque container's subtree must
+// collapse at EVERY depth, not just its direct children.
+describe('redact — opaque containers collapse at every depth (item 2)', () => {
+  it('collapses a multi-level-nested value under an opaque container instead of leaking any inner key', () => {
+    const line = {
+      type: 'assistant',
+      wireToolInputs: {
+        toolu_01AbCdEfGhIjKlMnOpQrStUv: { command: 'ls', nested: { secretParam: 'value', deeper: { x: 1 } } },
+      },
+    };
+
+    const result = redact(line);
+    const serialized = JSON.stringify(result);
+
+    expect(serialized).not.toContain('secretParam');
+    expect(serialized).not.toContain('"command"');
+    expect(serialized).not.toContain('deeper');
+  });
+
+  it('collapses a JSON-Schema properties map instead of leaking third-party parameter names', () => {
+    const line = {
+      type: 'user',
+      attachment: {
+        tools: [{ schema: { input_schema: { properties: { repo_owner: { type: 'string' }, repo_name: {} } } } }],
+      },
+    };
+
+    const result = redact(line);
+    const serialized = JSON.stringify(result);
+
+    expect(serialized).not.toContain('repo_owner');
+    expect(serialized).not.toContain('repo_name');
+    expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+  });
+});
+
+// Sibling top-level describe (not nested above) — item 2: an MCP server's own tool_use `input`
+// is opaque, but a built-in tool's `input` (Bash, Read, ...) must keep its parameter names.
+describe('redact — MCP tool_use input is opaque, built-in tool input is not (item 2)', () => {
+  function toolUseLine(name: string, input: Record<string, unknown>) {
+    return {
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name, input }] },
+    };
+  }
+
+  it("redacts an MCP-minted tool_use block's own input parameter names", () => {
+    const line = toolUseLine('mcp__github__create_issue', { repo_owner: 'acme', issue_body: 'secret plan' });
+
+    const result = redact(line);
+    const serialized = JSON.stringify(result);
+
+    expect(serialized).not.toContain('repo_owner');
+    expect(serialized).not.toContain('secret plan');
+    expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
+  });
+
+  it("keeps a built-in tool_use block's own input parameter names literal", () => {
+    const line = toolUseLine('Bash', { command: 'ls', description: 'list files' });
+
+    const result = redact(line);
+    const input = result.message.content[0].input;
+
+    expect(Object.keys(input).sort()).toEqual(['command', 'description']);
+    expect(input.command).toMatch(PLACEHOLDER);
+    expect(input.description).toMatch(PLACEHOLDER);
   });
 });
