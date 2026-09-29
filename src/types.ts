@@ -23,6 +23,11 @@ export interface SubAgent {
   // parentAgentId — see subagentMetadata.ts's attachNestedSubagents). Deliberately one level
   // only — a depth-3 chain (a grandchild's own children) is truncated, not represented here.
   children?: SubAgent[];
+  // Set by subagentCompletion.ts's detectSessionShutdown: the CLI's shutdown snapshot followed this
+  // subagent, so its host process exited with it. nestedSubagents.ts keys the grandchildren's
+  // 'stopped' off THIS flag, not off Session.shutdownRecorded — that latch self-clears the moment
+  // the session is resumed, while the grandchildren still died with the old process.
+  endedWithSession?: boolean;
 }
 
 export interface Session {
@@ -64,6 +69,7 @@ export interface Session {
   lastEntryType?: string; // `type` of the last transcript entry — 'user' means Claude still owes a reply
   lastEntryIsThinking?: boolean; // Last conversational turn was a thinking-only block — mid-turn, still working
   lastEntryIsInterruption?: boolean; // Last user turn was Claude Code's own interruption sentinel (Esc), not a real prompt — overrides the 'user' reading of lastEntryType above. Recomputed on every message-bearing turn like lastEntryType, so it self-clears the moment a genuine next turn lands.
+  shutdownRecorded?: boolean; // Latch: the CLI's shutdown snapshot (`type:"cost-state"`, appended as the process exits) is the last thing written and no real turn followed it — the process is gone, so nothing in this session can still be working, whatever its subagents' own tracked status says. Self-clears to false on the next message-bearing turn (the session was resumed) — see turnSignals.ts's trackShutdownSignal.
   lastEntryIsApiError?: boolean; // Latch: the session's last real signal was an API error — a `system:api_error` entry (which carries no `message` of its own) or an assistant turn carrying `apiError`/`isApiErrorMessage`. Feeds computeSessionStatus's 'error' status. Self-clears back to false the instant any other message-bearing turn follows (Claude Code auto-retries some errors), same latch-that-self-clears shape as lastEntryIsInterruption above — see logParser.ts's trackApiErrorSignal.
   entrypoint?: string; // How the session started: 'claude-vscode'/'cli' = human, 'sdk-*' = spawned agent
   claudeVersion?: string; // Claude Code version stamped on the transcript (`version` field), for compat checks

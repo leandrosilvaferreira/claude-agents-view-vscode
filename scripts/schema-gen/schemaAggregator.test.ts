@@ -292,6 +292,30 @@ describe('aggregateSchema — MCP tool_use input is opaque, built-in tool input 
     expect(paths).not.toContain('message.content.[].input.repo_name');
   });
 
+  it("collapses a StructuredOutput tool_use block — its input is a caller-defined schema, not the tool's own parameters", async () => {
+    const line = parsedLine(toolUseLine('StructuredOutput', { someProjectField: 'x', anotherProjectField: 'y' }));
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.assistant.fields);
+    expect(paths).toContain('message.content.[].input.[dynamic-key]');
+    expect(JSON.stringify(paths)).not.toContain('someProjectField');
+  });
+
+  it('collapses the data of a structured_output attachment onto attachment.data.[dynamic-key]', async () => {
+    const line = parsedLine({
+      type: 'attachment',
+      version: '2.1.11',
+      attachment: { type: 'structured_output', toolUseID: 'toolu_1', data: { someProjectField: 'x' } },
+    });
+
+    const { model } = await aggregateSchema(toResults([line]));
+
+    const paths = Object.keys(model.types.attachment.fields);
+    expect(paths).toContain('attachment.data.[dynamic-key]');
+    expect(JSON.stringify(paths)).not.toContain('someProjectField');
+  });
+
   it("keeps a built-in tool_use block's own parameter names as literal field paths", async () => {
     const line = parsedLine(toolUseLine('Bash', { command: 'ls', description: 'list files' }));
 

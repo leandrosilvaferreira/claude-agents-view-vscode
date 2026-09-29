@@ -33,3 +33,9 @@
 - [scripts/package.json type:module breaks tsc NodeNext](architecture-scripts-package-json-breaks-tsc-nodenext.md) — flips scripts/ to ESM-ambient, forcing TS2835 on every extensionless import; unneeded once tsx is the runner.
 
 - [Large generated file breaks lintRules.test.ts](architecture-generated-file-breaks-eslint-projectservice.md) — transcriptShapes.ts (~8000 lines) slows ESLint's parserOptions.projectService enough to time out an unrelated test; check before committing T12's real baseline.
+
+- [CLI shutdown marker `cost-state`](architecture-cli-shutdown-marker-cost-state.md) — last line a process/conversation writes on exit; without it a killed session + its background subagents stay 'working' 30+ min (ghost rows beside the successor session).
+
+- [Workflow journal is not a session](architecture-workflow-journal-not-a-session.md) — `subagents/workflows/wf_*/journal.jsonl` has no isSidechain, so the recursive watcher registered a phantom session "journal"; session registration is layout-based (`isClaudeSessionFile`).
+
+- [schema:generate leaks free-form payload vocabulary](architecture-schema-gen-freeform-payloads-leak-vocabulary.md) — StructuredOutput input / structured_output data / journal result field names reach the committed schema (redactor scrubs values only); grep the diff before committing; readline splits U+2028.

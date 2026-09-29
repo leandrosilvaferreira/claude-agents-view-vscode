@@ -1,0 +1,10 @@
+---
+name: architecture-schema-gen-freeform-payloads-leak-vocabulary
+description: `npm run schema:generate` records free-form agent payloads' field names (StructuredOutput tool input, structured_output attachment data, Workflow journal result) into committed files — the redactor only scrubs values. Read the diff for project vocabulary before committing.
+metadata:
+  type: architecture
+---
+
+A caller-defined JSON schema reaches the transcripts three ways: the built-in `StructuredOutput` tool's `input` (`assistant` `message.content[]`), the `structured_output` attachment's `data`, and a Workflow journal's `result`. Their FIELD NAMES are project vocabulary; the generator kept them literally in `schema-observations.json` and `transcriptShapes.ts` (about 25 business-domain names of a private project in one run — the repo is public). Values were always redacted; keys were not.
+**Why:** `keySafety` judges a key by shape and by container name; `input`/`data` are ordinary names elsewhere, so the rule needs a SIBLING field (`name`/`type`) — `isStructuredOutputPayloadKey`, next to `isMcpToolUseInputKey` (same idea, MCP tools). A first fix that only skipped journals looked done and leaked through the other two paths: found only by grepping the regenerated output for the business terms (2026-09-28). The same run also reported 125 false "parse errors": Node's `readline` splits on raw U+2028/U+2029 (valid inside a JSON string), so `walkFile` splits on `\n` only, like `LogParser`.
+**How to apply:** after ANY `npm run schema:generate` (13–18 min over ~6 GB — run it detached, the Bash tool's 10 min timeout kills it), diff the observations against the committed baseline and grep the result for domain terms; a new built-in tool with free-form input needs its own sibling rule. The generator merges additively onto the COMMITTED observations, so a leaky run must be reverted (`git checkout` the generated files) before re-running — regenerating on top keeps the leaked keys. Workflow journals are also skipped by the walk (`WORKFLOW_JOURNAL`). See [[architecture-workflow-journal-not-a-session]] and [[architecture-no-public-transcript-schema]].

@@ -1,5 +1,10 @@
 import { ParseError, WalkResult } from './corpusWalker';
-import { isKnownDynamicKeyContainer, isMcpToolUseInputKey, isSchemaLikeKey } from './keySafety';
+import {
+  isKnownDynamicKeyContainer,
+  isMcpToolUseInputKey,
+  isSchemaLikeKey,
+  isStructuredOutputPayloadKey,
+} from './keySafety';
 import {
   compareVersions,
   mergeFieldObservation,
@@ -192,7 +197,10 @@ function walkValue(value: unknown, ctx: WalkContext, fields: Map<string, FieldOb
           // `value` here is the CURRENT object being iterated — the container itself for the
           // static name check, and the tool_use block for the MCP sibling-context check (see
           // isMcpToolUseInputKey's own doc comment for why that one needs the container).
-          forceDynamicKey: isKnownDynamicKeyContainer(key) || isMcpToolUseInputKey(value, key),
+          forceDynamicKey:
+            isKnownDynamicKeyContainer(key) ||
+            isMcpToolUseInputKey(value, key) ||
+            isStructuredOutputPayloadKey(value, key),
         },
         fields,
       );

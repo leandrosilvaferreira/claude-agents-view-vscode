@@ -127,8 +127,16 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   (see its own doc comment). Extracted out of `sessionTreeDataProvider.ts` to stay under
   this repo's 350-line file budget and because vscode-free code here is directly
   unit-testable.
+- **claudeCompatNotice.ts** — the "unvalidated Claude Code version" warning:
+  `createClaudeCompatNotifier(notify)` warns once per provider when a session's
+  `claudeVersion` is newer than the pinned `KNOWN_COMPATIBLE_CLAUDE_VERSION`
+  (`claudeCompat.ts`). Extracted out of `sessionTreeDataProvider.ts` for the 350-line
+  budget; vscode-free — the provider injects `showWarningMessage` as `notify`.
 - **sessionScanner.ts** — discovers Claude (`~/.claude/projects/**/*.jsonl`) and
-  Antigravity (`~/.gemini/.../transcript.jsonl`) log files. Pure, never throws.
+  Antigravity (`~/.gemini/.../transcript.jsonl`) log files. Pure, never throws. Also
+  `isClaudeSessionFile`: the layout test (`<project>/<id>.jsonl`) the recursive watcher applies
+  before registering a changed file as a session — a Workflow run's `journal.jsonl` carries no
+  `isSidechain` flag and would otherwise appear as a phantom session named `journal`.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads
   only appended bytes, plus a per-file `seenToolUseIds` set carried across those
   incremental reads — subagentDetector.ts's guard against re-appended history lines);
@@ -139,7 +147,9 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   tool-call `Cwd`, else walks up for a project marker.
 - **sessionActivity.ts** — decides whether a session is still running (`lsof` on
   macOS/Linux only, recent write, user turn awaiting a reply, thinking-only last turn,
-  or live subagents).
+  or live subagents). One signal outranks all the heuristics: the CLI's `cost-state`
+  shutdown snapshot as the file's tail (`Session.shutdownRecorded`, `turnSignals.ts`) means
+  the process exited, so the session is 'stopped' at once — see `subagentCompletion.ts`.
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
   Three Claude launch shapes, only one of which is a `tool_use`: classic `Agent` tool,
@@ -152,15 +162,24 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `detectAgentsKilled` (subagentCompletion.ts) on every entry.
   See `.claude/memory/architecture-subagent-dispatch-mechanisms.md`.
 - **subagentCompletion.ts** — the completion half of `subagentDetector` (split out for the
-  350-line budget): the launch/resume ACKs that must NOT read as completions
-  (`async_launched`, `teammate_spawned`, SendMessage's `resumedAgentId`, a queued-message
-  `{success:true, pin}`, or a teammate-inbox send `{success:true, routing}`) plus the three
-  real completion shapes — synchronous `tool_result`, `<task-notification>`, and an
-  in-process teammate's `<teammate-message>` `idle_notification`. That same async/teammate
-  ACK (or a `<forked-skill-launch>` at launch) also flags the subagent `isBackground`, which
+  350-line budget): the three real completion shapes — synchronous `tool_result`,
+  `<task-notification>`, and an in-process teammate's `<teammate-message>`
+  `idle_notification` — after the launch/resume ACK filter of `subagentLaunchAck.ts`. That
+  async/teammate ACK (or a `<forked-skill-launch>` at launch) also flags the subagent
+  `isBackground`, which
   `detectAgentsKilled` uses to stop every still-`working` BACKGROUND subagent on a
   `system:agents_killed` entry (Claude Code 2.1.258+, no Antigravity equivalent) while
-  leaving a synchronous Agent call — no such ACK exists for it — alone.
+  leaving a synchronous Agent call — no such ACK exists for it — alone. A `cost-state`
+  entry (the CLI's shutdown snapshot, its last write as the process exits) is different: it
+  stops EVERY subagent, foreground included, rules out any later re-wake, and stops
+  grandchildren too (`nestedSubagents.ts`), since none survives its process — an
+  update/restart otherwise left the dead session and its agents 'working' as a ghost row
+  beside the successor session.
+- **subagentLaunchAck.ts** — the launch/resume ACK half of `subagentCompletion.ts` (split out
+  for the 350-line budget): the ACKs that must NOT read as completions (`async_launched`,
+  `teammate_spawned`, SendMessage's `resumedAgentId`, a queued-message `{success:true, pin}`,
+  or a teammate-inbox send `{success:true, routing}`), plus what a launch `tool_result`
+  records about the subagent (`agentId`, `isBackground`). Never stops a subagent.
 - **sidecarReader.ts** — reads the `agent-<id>.meta.json` sidecars from both candidate
   directories (the transcript's own and the one `projectPath` encodes to — they differ
   inside a worktree), dedupes across them, and caches by filename set so a refresh that
@@ -202,8 +221,8 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   logs via `logDebug` and returns an empty/fallback value; a bad log line must never
   break the tree.
 - **Keep `vscode` out of the parsing core** — `logParser`, `subagentDetector`, `subagentCompletion`,
-  `subagentRewake`, `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`,
-  `sessionActivity` import no `vscode` and are
+  `subagentLaunchAck`, `claudeCompatNotice`, `subagentRewake`, `nameExtractor`, `sessionDedupe`,
+  `sessionScanner`, `projectPathResolver`, `sessionActivity` import no `vscode` and are
   unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,
   `treeItems.ts`, `subagentTreeChildren.ts` touch the VS Code API.
 - **Parse incrementally** — `LogParser` caches a per-file byte offset and reads only

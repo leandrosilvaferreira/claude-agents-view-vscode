@@ -41,6 +41,24 @@ export function refreshNestedSubagents(session: Session): void {
     return;
   }
   attachNestedSubagents(session.subagents, sidecars);
+  stopGrandchildrenOfEndedSubagents(session.subagents);
+}
+
+/** The grandchildren of a subagent whose host process exited (SubAgent.endedWithSession, set at
+ * the CLI's shutdown snapshot — see turnSignals.ts's trackShutdownSignal) died with it, so the
+ * mtime-based status computeChildStatus just gave them — 'working' for up to IDLE_CEILING after the
+ * exit — is a ghost. The parser already stopped the level-1 subagents; this is the level that only
+ * exists as a per-tick sidecar join. Keyed on the subagent's own flag rather than on the session's
+ * latch, which self-clears when the session is resumed: a same-id resume must not revive them. */
+function stopGrandchildrenOfEndedSubagents(subs: SubAgent[]): void {
+  for (const sub of subs) {
+    if (sub.endedWithSession !== true) {
+      continue;
+    }
+    for (const child of sub.children ?? []) {
+      child.status = 'stopped';
+    }
+  }
 }
 
 /**

@@ -7,7 +7,7 @@ import { ProjectPathResolver } from './projectPathResolver';
 import { detectSubagents } from './subagentDetector';
 import { enrichSubagentMetadata } from './subagentMetadata';
 import { LogEntry } from './transcriptEntry';
-import { trackTurnSignals, trackApiErrorSignal } from './turnSignals';
+import { trackTurnSignals, trackApiErrorSignal, trackShutdownSignal } from './turnSignals';
 import { CodexLogParser } from './codexLogParser';
 
 // Re-exported so existing importers (e.g. subagentDetector) keep resolving LogEntry from here.
@@ -151,6 +151,7 @@ export class LogParser {
       }
       trackTurnSignals(json, session);
       trackApiErrorSignal(json, session);
+      trackShutdownSignal(json, session);
       this.detectEntrypointAndVersion(json, session);
       this.parseTimestamp(json, session, stats);
       this.projectPaths.detectGitBranch(json, session);

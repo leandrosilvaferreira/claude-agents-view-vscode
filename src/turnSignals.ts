@@ -5,7 +5,7 @@ import { LogEntry } from './transcriptEntry';
  * Per-line turn-signal tracking for LogParser: reads one transcript entry and updates the
  * Session-level flags that describe what happened in the session's own conversation (thinking,
  * interruption, api error) — extracted from logParser.ts purely to keep that file under its line
- * budget. Both exported functions are pure: they only read `json` and mutate the `session` passed
+ * budget. Every exported function here is pure: they only read `json` and mutate the `session` passed
  * in, no LogParser instance state, which is what made this extraction possible in the first place.
  */
 
@@ -129,5 +129,46 @@ export function trackApiErrorSignal(json: LogEntry, session: Session): void {
   }
   if (json.message) {
     session.lastEntryIsApiError = false;
+  }
+}
+
+/**
+ * Track whether this transcript's conversation is over: Claude Code appends one
+ * `{"type":"cost-state", …}` snapshot (the cost ledger `--resume` restores) when its process shuts
+ * down — and, through the same saver, when it leaves a conversation in-process (`/clear`, a
+ * resume/fork switch). It is the last thing that process writes to the file, usually right after a
+ * `last-prompt` bookkeeping line, and carries no `message` and no `timestamp`, so, like the
+ * api_error entry above, it needs its own unconditional read rather than a slot in
+ * trackTurnSignals's message gate. Real corpus (2.1.227-2.1.284, 610 transcripts, 652 markers): 637
+ * are followed by nothing but bookkeeping to EOF (606 of them as the literal last line) and 15 by
+ * real turns of a fresh process resuming the same session id; every interactive session on
+ * 2.1.278+ that ended cleanly carries one.
+ *
+ * Without this, a session whose process exited mid-run (real: the 2.1.283 -> 2.1.284 auto-update
+ * restart, which exited three sessions within the same second) is indistinguishable from a quiet
+ * live one: its background subagents never report completion, and the marker write itself
+ * refreshes the file's mtime — so computeSessionStatus read the dead session 'working' for up to
+ * IDLE_CEILING, and its "Working Agents" group stayed full even after that: a ghost row beside the
+ * successor session the user started in the same worktree. A hard kill (SIGKILL, crash, power
+ * loss) or a VS Code/SDK session older than 2.1.278 leaves no marker and still falls back on those
+ * mtime heuristics.
+ *
+ * Self-clears the moment any message-bearing turn follows (the same file was resumed — a fresh
+ * process appends to it, usually opening with queue-operation/attachment bookkeeping first), same
+ * latch-that-self-clears shape as lastEntryIsApiError above; a trailing bookkeeping entry
+ * (attachment, ai-title, …) leaves the flag exactly as it was. Sidechain entries are ignored
+ * outright, same top guard as the two functions above: a subagent's transcript interleaved into
+ * this file is not this session's process exiting.
+ */
+export function trackShutdownSignal(json: LogEntry, session: Session): void {
+  if (json.isSidechain === true) {
+    return;
+  }
+  if (json.type === 'cost-state') {
+    session.shutdownRecorded = true;
+    return;
+  }
+  if (json.message) {
+    session.shutdownRecorded = false;
   }
 }

@@ -52,7 +52,12 @@
  * before recursing, rather than `redactValue` re-deriving it from `key` alone.
  */
 
-import { isKnownDynamicKeyContainer, isMcpToolUseInputKey, isSchemaLikeKey } from './keySafety';
+import {
+  isKnownDynamicKeyContainer,
+  isMcpToolUseInputKey,
+  isSchemaLikeKey,
+  isStructuredOutputPayloadKey,
+} from './keySafety';
 
 /** Key names whose string value is a known closed set (not free text) — see
  * CLOSED_VOCABULARY_VALUE below: the key alone isn't enough, the value must also look like an
@@ -114,13 +119,17 @@ interface KeyContext {
 }
 
 /** True when the value at `ctx.key` must have ALL of its own children forced unsafe once
- * recursed into — a known dynamic-key/opaque container by name, or an MCP tool_use block's
- * `input` by sibling context. */
+ * recursed into — a known dynamic-key/opaque container by name, or, by sibling context, an MCP
+ * tool_use block's `input` or a structured-output payload (isStructuredOutputPayloadKey). */
 function isOpaqueChildKey(ctx: KeyContext): boolean {
   if (ctx.key === undefined) {
     return false;
   }
-  return isKnownDynamicKeyContainer(ctx.key) || (ctx.parent !== undefined && isMcpToolUseInputKey(ctx.parent, ctx.key));
+  return (
+    isKnownDynamicKeyContainer(ctx.key) ||
+    (ctx.parent !== undefined &&
+      (isMcpToolUseInputKey(ctx.parent, ctx.key) || isStructuredOutputPayloadKey(ctx.parent, ctx.key)))
+  );
 }
 
 /** Redacts a non-array, non-object leaf: numbers and strings default-deny (see the module

@@ -59,6 +59,14 @@ export function computeSessionStatus(session: Session, openFiles: Set<string>): 
   if (openFiles.has(path.normalize(session.logFilePath))) {
     return 'working';
   }
+  // The CLI's shutdown snapshot is the last thing a process writes — so the file is fresh (inside
+  // RECENT_WRITE) precisely when it has just exited, and every heuristic below would read that as
+  // alive. Its own latch (Session.shutdownRecorded) outranks them all, lsof aside: a process that
+  // does hold the transcript open has resumed it, whatever the tail of the file still says. An
+  // ended session reads plain 'stopped', never 'error': that alarm is for one that may recover.
+  if (session.shutdownRecorded === true) {
+    return 'stopped';
+  }
   const idle = Date.now() - session.lastInteractionTime;
   if (idle < RECENT_WRITE) {
     return 'working';
@@ -73,9 +81,15 @@ export function computeSessionStatus(session: Session, openFiles: Set<string>): 
   if (session.lastEntryIsApiError === true) {
     return 'error';
   }
+  return isMidTurn(session) ? 'working' : 'stopped';
+}
+
+/** Claude still owes this session's own conversation something: a user turn awaiting its reply
+ * (unless that turn is the user's own Esc) or a thinking-only last turn. Split out of
+ * computeSessionStatus only to keep that function under the repo's cyclomatic-complexity budget. */
+function isMidTurn(session: Session): boolean {
   const awaitingReply = session.lastEntryType === 'user' && !session.lastEntryIsInterruption;
-  const isThinking = session.lastEntryIsThinking === true;
-  return awaitingReply || isThinking ? 'working' : 'stopped';
+  return awaitingReply || session.lastEntryIsThinking === true;
 }
 
 /** Set of transcript files currently held open, per `lsof`. Scoped to ~/.claude and ~/.gemini to

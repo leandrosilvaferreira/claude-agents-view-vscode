@@ -336,6 +336,18 @@ describe('redact — MCP tool_use input is opaque, built-in tool input is not (i
     expect(serialized).toMatch(/"Sample key \d+":"Sample text \d+"/);
   });
 
+  it("redacts a StructuredOutput tool_use block's input field names — a caller-defined schema", () => {
+    const line = toolUseLine('StructuredOutput', { someProjectField: 'x', anotherProjectField: 'y' });
+
+    expect(JSON.stringify(redact(line))).not.toContain('ProjectField');
+  });
+
+  it('redacts the data field names of a structured_output attachment', () => {
+    const line = { type: 'attachment', attachment: { type: 'structured_output', data: { someProjectField: 'x' } } };
+
+    expect(JSON.stringify(redact(line))).not.toContain('someProjectField');
+  });
+
   it("keeps a built-in tool_use block's own input parameter names literal", () => {
     const line = toolUseLine('Bash', { command: 'ls', description: 'list files' });
 

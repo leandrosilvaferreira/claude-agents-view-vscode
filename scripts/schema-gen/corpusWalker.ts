@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as readline from 'readline';
 import { z } from 'zod';
 
 /**
@@ -75,6 +74,15 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** A Workflow run's journal (`<session>/subagents/workflows/wf_*\/journal.jsonl`, Claude Code
+ * 2.1.28x). Not a transcript: its lines are `launched`/`started`/`result` bookkeeping, and a
+ * `result` is an arbitrary JSON object the workflow's own agents produced — free-form, project-
+ * specific field names that keySafety can neither judge by shape nor collapse by container, and
+ * that would land verbatim in the committed observations and TS reference (a real run added ~25
+ * business-domain names that way). The same run's `agent-*.jsonl` sidechains next to it ARE
+ * transcripts and stay in. */
+const WORKFLOW_JOURNAL = /(^|[\\/])workflows[\\/][^\\/]+[\\/]journal\.jsonl$/;
+
 /** Every `.jsonl` file under `rootDir`, recursive, sorted for a deterministic walk order.
  * Returns an empty list rather than throwing when `rootDir` doesn't exist or isn't
  * readable — an absent corpus (e.g. a machine that has never run Claude Code) is not an
@@ -87,37 +95,59 @@ function findJsonlFiles(rootDir: string): string[] {
     return [];
   }
   return entries
-    .filter((entry) => entry.endsWith('.jsonl'))
+    .filter((entry) => entry.endsWith('.jsonl') && !WORKFLOW_JOURNAL.test(entry))
     .map((entry) => path.join(rootDir, entry))
     .sort();
 }
 
+/** Splits on `\n` only. Node's `readline` also breaks on U+2028/U+2029, which are valid unescaped
+ * inside a JSON string (Claude Code writes them raw in tool output): real corpus, 125 records over
+ * 15 files cut in two and reported as parse errors although every one parses fine. */
 async function* walkFile(filePath: string): AsyncGenerator<WalkResult> {
   const input = fs.createReadStream(filePath, { encoding: 'utf8' });
-  const lines = readline.createInterface({ input, crlfDelay: Infinity });
   let lineNumber = 0;
-  for await (const line of lines) {
-    lineNumber += 1;
-    if (line.trim() === '') {
-      continue; // blank lines carry nothing to observe
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line) as unknown;
-    } catch (error) {
-      yield { ok: false, filePath, lineNumber, rawLine: snippet(line), message: describeError(error) };
+  let pending = '';
+  for await (const chunk of input) {
+    const text = String(chunk);
+    // Cut at this chunk's last newline only: re-splitting `pending + chunk` on every chunk is
+    // quadratic for one very long line (tens of MB take seconds), while the carry-over below is not.
+    const cut = text.lastIndexOf('\n');
+    if (cut === -1) {
+      pending += text;
       continue;
     }
-
-    const result = jsonObjectSchema.safeParse(parsed);
-    if (!result.success) {
-      yield { ok: false, filePath, lineNumber, rawLine: snippet(line), message: result.error.issues[0].message };
-      continue;
+    const lines = (pending + text.slice(0, cut)).split('\n');
+    pending = text.slice(cut + 1);
+    for (const line of lines) {
+      lineNumber += 1;
+      yield* observeLine(filePath, lineNumber, line);
     }
-
-    yield { ok: true, filePath, lineNumber, value: result.data };
   }
+  if (pending !== '') {
+    yield* observeLine(filePath, lineNumber + 1, pending);
+  }
+}
+
+function* observeLine(filePath: string, lineNumber: number, line: string): Generator<WalkResult> {
+  if (line.trim() === '') {
+    return; // blank lines carry nothing to observe
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line) as unknown;
+  } catch (error) {
+    yield { ok: false, filePath, lineNumber, rawLine: snippet(line), message: describeError(error) };
+    return;
+  }
+
+  const result = jsonObjectSchema.safeParse(parsed);
+  if (!result.success) {
+    yield { ok: false, filePath, lineNumber, rawLine: snippet(line), message: result.error.issues[0].message };
+    return;
+  }
+
+  yield { ok: true, filePath, lineNumber, value: result.data };
 }
 
 /**

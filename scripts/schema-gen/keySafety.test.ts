@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isKnownDynamicKeyContainer, isMcpToolUseInputKey, isSchemaLikeKey } from './keySafety';
+import {
+  isKnownDynamicKeyContainer,
+  isMcpToolUseInputKey,
+  isSchemaLikeKey,
+  isStructuredOutputPayloadKey,
+} from './keySafety';
 
 describe('isSchemaLikeKey', () => {
   it.each([
@@ -137,5 +142,38 @@ describe('isMcpToolUseInputKey', () => {
   it('does not flag `input` when the container is not a tool_use block at all', () => {
     expect(isMcpToolUseInputKey({ type: 'text', name: 'mcp__github__create_issue' }, 'input')).toBe(false);
     expect(isMcpToolUseInputKey({ name: 'mcp__github__create_issue' }, 'input')).toBe(false);
+  });
+});
+
+// The result of a structured-output request is a JSON schema someone else wrote, so its field
+// names are project vocabulary — judgeable only from a SIBLING field (`name` / `type`), like the
+// MCP case above.
+describe('isStructuredOutputPayloadKey', () => {
+  const structuredOutputToolUse = { type: 'tool_use', name: 'StructuredOutput' };
+  const structuredOutputAttachment = { type: 'structured_output', toolUseID: 'toolu_1' };
+
+  it('flags `input` under a StructuredOutput tool_use block', () => {
+    expect(isStructuredOutputPayloadKey(structuredOutputToolUse, 'input')).toBe(true);
+  });
+
+  it('flags `data` under a structured_output attachment', () => {
+    expect(isStructuredOutputPayloadKey(structuredOutputAttachment, 'data')).toBe(true);
+  });
+
+  it('does not flag `input` under another built-in tool_use, nor `data` under another attachment type', () => {
+    expect(isStructuredOutputPayloadKey({ type: 'tool_use', name: 'Bash' }, 'input')).toBe(false);
+    expect(isStructuredOutputPayloadKey({ type: 'hook_success', toolUseID: 'toolu_1' }, 'data')).toBe(false);
+  });
+
+  it('does not flag `input` unless the container really is a tool_use block named StructuredOutput', () => {
+    expect(isStructuredOutputPayloadKey({ name: 'StructuredOutput' }, 'input')).toBe(false);
+    expect(isStructuredOutputPayloadKey({ type: 'text', name: 'StructuredOutput' }, 'input')).toBe(false);
+  });
+
+  it('does not flag a sibling key, nor the wrong key for the container', () => {
+    expect(isStructuredOutputPayloadKey(structuredOutputToolUse, 'name')).toBe(false);
+    expect(isStructuredOutputPayloadKey(structuredOutputToolUse, 'data')).toBe(false);
+    expect(isStructuredOutputPayloadKey(structuredOutputAttachment, 'input')).toBe(false);
+    expect(isStructuredOutputPayloadKey(structuredOutputAttachment, 'toolUseID')).toBe(false);
   });
 });

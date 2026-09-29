@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { scanSessionFiles, LogFileRef } from '../sessionScanner';
+import { scanSessionFiles, isClaudeSessionFile, LogFileRef } from '../sessionScanner';
 
 // Real-tmpdir pattern (mirrors subagentMetadata.test.ts / logParser.projectPath.test.ts):
 // sessionScanner is fundamentally about directory traversal, so these tests build real
@@ -214,5 +214,55 @@ describe('scanSessionFiles', () => {
       }).not.toThrow();
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe('isClaudeSessionFile', () => {
+  // The recursive `**/*.jsonl` watcher reports every jsonl under the projects root, at any depth;
+  // only what scanSessionFiles itself would list may register as a session. Real layouts
+  // (2.1.284 corpus): 1,704 <project>/<id>.jsonl, 4,425 <project>/<id>/subagents/agent-*.jsonl,
+  // 10 + 3 under <project>/<id>/subagents/workflows/wf_*/ (agent transcripts + `journal.jsonl`).
+  const root = path.join(os.tmpdir(), 'claude-projects');
+  const id = '5d1e8a20-6b3a-4c7b-9a3e-2f6b1c8d4e50';
+
+  it('accepts a root-level transcript, and one under <project>/sessions/ (the scanner contract)', () => {
+    expect(isClaudeSessionFile(root, path.join(root, 'project-a', `${id}.jsonl`))).toBe(true);
+    expect(isClaudeSessionFile(root, path.join(root, 'project-a', 'sessions', `${id}.jsonl`))).toBe(true);
+  });
+
+  it('rejects a subagent sidechain transcript', () => {
+    const file = path.join(root, 'project-a', id, 'subagents', 'agent-a1b2c3.jsonl');
+    expect(isClaudeSessionFile(root, file)).toBe(false);
+  });
+
+  it('rejects a Workflow journal — it carries no isSidechain flag, so it would register as a session named "journal"', () => {
+    const file = path.join(root, 'project-a', id, 'subagents', 'workflows', 'wf_0a1b2c3d-001', 'journal.jsonl');
+    expect(isClaudeSessionFile(root, file)).toBe(false);
+  });
+
+  it('rejects a Workflow agent transcript', () => {
+    const file = path.join(root, 'project-a', id, 'subagents', 'workflows', 'wf_0a1b2c3d-001', 'agent-a1b2c3.jsonl');
+    expect(isClaudeSessionFile(root, file)).toBe(false);
+  });
+
+  it('rejects anything that is not a .jsonl transcript or lies outside the projects root', () => {
+    expect(isClaudeSessionFile(root, path.join(root, 'project-a', `${id}.jsonl.superseded-1789004527256`))).toBe(false);
+    expect(isClaudeSessionFile(root, path.join(os.tmpdir(), 'elsewhere', `${id}.jsonl`))).toBe(false);
+    expect(isClaudeSessionFile(root, path.join(root, `${id}.jsonl`))).toBe(false);
+    // Shapes a bare length/`sessions` check would accept: `../sessions/<id>.jsonl` (3 parts) and
+    // `../<id>.jsonl` (2 parts) — a sibling of the projects root, not a session under it.
+    expect(isClaudeSessionFile(root, path.join(os.tmpdir(), 'sessions', `${id}.jsonl`))).toBe(false);
+    expect(isClaudeSessionFile(root, path.join(os.tmpdir(), `${id}.jsonl`))).toBe(false);
+  });
+
+  it('rejects a transcript one folder deep unless that folder is `sessions`', () => {
+    expect(isClaudeSessionFile(root, path.join(root, 'project-a', 'tool-results', `${id}.jsonl`))).toBe(false);
+  });
+
+  // path.relative answers with an ABSOLUTE path across drives, and `D:\x.jsonl` splits into two
+  // parts — exactly the length of a real `<project>/<id>.jsonl`, so only the isAbsolute guard
+  // rejects it. Other platforms have no drives, hence Windows-only.
+  it.runIf(process.platform === 'win32')('rejects a transcript on another drive', () => {
+    expect(isClaudeSessionFile('C:\\claude-projects', 'D:\\x.jsonl')).toBe(false);
   });
 });

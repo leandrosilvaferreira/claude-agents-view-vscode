@@ -8,12 +8,12 @@ import { refreshSessionStatuses } from '../sessionStatusRefresh';
 /**
  * Shape of real session 537d9b05 (Claude Code 2.1.257): a foreground (synchronous) Agent launch
  * with no explicit `name`, completing with `toolUseResult: {status:'completed', agentId}` — NOT
- * the backgrounded `async_launched` ACK subagentCompletion.ts's recordLaunchAgentId already reads
+ * the backgrounded `async_launched` ACK subagentLaunchAck.ts's recordResultAgentId already reads
  * agentId from today. It is then resumed by SendMessage addressed by that agentId, and the resume
  * itself completes via a later <task-notification>.
  *
- * HIGH-regression mutant this pins: recordLaunchAgentId only runs inside the launch/resume-ACK
- * branch (isLaunchOrResumeAck), so a SYNC completion's own `toolUseResult.agentId` is never read
+ * HIGH-regression mutant this pins: recordResultAgentId only runs inside the launch/resume-ACK
+ * branch (isLaunchOrSendMessageAck), so a SYNC completion's own `toolUseResult.agentId` is never read
  * at parse time — only much later, via subagentMetadata's end-of-batch sidecar join. In a single
  * cold parse that processes the completion, the SendMessage, and the resume ACK all in the SAME
  * batch, `sub.agentId` is therefore still unset when the SendMessage is detected —

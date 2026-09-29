@@ -1,7 +1,12 @@
 import { SubAgent } from './types';
 import type { LogEntry } from './logParser';
 import { detectForkedSkillLaunch } from './forkedSkillDetector';
-import { detectAgentsKilled, detectCompletions, findSubagentEntryByTarget } from './subagentCompletion';
+import {
+  detectAgentsKilled,
+  detectCompletions,
+  detectSessionShutdown,
+  findSubagentEntryByTarget,
+} from './subagentCompletion';
 
 /**
  * Detect subagent starts/completions from one log entry and mutate the running map.
@@ -32,6 +37,7 @@ export function detectSubagents(
   detectClaudeCalls(json, currentSubagents, seenToolUseIds);
   detectSendMessageResume(json, currentSubagents, seenToolUseIds);
   detectAgentsKilled(json, currentSubagents);
+  detectSessionShutdown(json, currentSubagents);
   detectClaudeStandaloneCalls(json, currentSubagents);
   detectForkedSkillLaunch(json, currentSubagents);
   detectCompletions(json, currentSubagents);
@@ -177,6 +183,7 @@ function reactivateSubagent(currentSubagents: Map<string, SubAgent>, entry: [str
   sub.status = 'working';
   sub.isBackground = true;
   sub.stoppedAt = undefined;
+  sub.endedWithSession = false; // resumed in the live process now: see SubAgent.endedWithSession
   sub.id = newId;
   currentSubagents.set(newId, sub);
 }

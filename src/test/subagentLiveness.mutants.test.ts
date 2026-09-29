@@ -52,7 +52,7 @@ describe('in-process teammate SendMessage ACK shapes', () => {
     } as unknown as LogEntry;
   }
 
-  // Real shape (session f03a74fb, per subagentCompletion.ts's isSendMessageAck doc comment):
+  // Real shape (session f03a74fb, per subagentLaunchAck.ts's isSendMessageAck doc comment):
   // {success:true, message:"Message sent to <name>'s inbox", msg_id, routing:{content, sender,
   // summary, target, targetColor}} — no `pin` at all, unlike an Agent-tool subagent's ACK.
   function inboxSendMessageAckTurn(toolUseId: string, name: string): LogEntry {

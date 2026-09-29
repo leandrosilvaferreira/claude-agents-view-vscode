@@ -8,6 +8,29 @@ export interface LogFileRef {
   type: Session['type'];
 }
 
+/**
+ * True when `filePath` is a file scanClaudeSessions would list: a standalone session transcript,
+ * `<project>/<id>.jsonl` or `<project>/sessions/<id>.jsonl`. The recursive `**\/*.jsonl` watcher
+ * (sessionFileWatchers.ts) reports every jsonl at any depth, and most of the extras excuse
+ * themselves — a subagent sidechain transcript (`<project>/<id>/subagents/agent-*.jsonl`) stamps
+ * `isSidechain` on every line, so the parser hides it. A Workflow journal (Claude Code 2.1.28x,
+ * `<project>/<id>/subagents/workflows/wf_*\/journal.jsonl`) does not: its lines are only
+ * `launched`/`started`/`result` with no sidechain flag, cwd or prompt, so it registered as a
+ * phantom session named `journal` — `stopped` and title-less, or `working` for as long as the
+ * workflow kept writing to it. Layout, not content, is what says "not a session".
+ */
+export function isClaudeSessionFile(claudeProjectsPath: string, filePath: string): boolean {
+  if (!filePath.endsWith('.jsonl')) {
+    return false;
+  }
+  const relative = path.relative(claudeProjectsPath, filePath);
+  const parts = relative.split(path.sep);
+  if (path.isAbsolute(relative) || parts[0] === '..') {
+    return false; // outside the projects root (a different drive on Windows comes back absolute)
+  }
+  return parts.length === 2 || (parts.length === 3 && parts[1] === 'sessions');
+}
+
 /** Discover every Claude Code and Antigravity log file on disk. Never throws. */
 export function scanSessionFiles(
   claudeProjectsPath: string,

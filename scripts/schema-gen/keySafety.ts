@@ -152,3 +152,23 @@ export function isMcpToolUseInputKey(container: Record<string, unknown>, key: st
     container.name.startsWith(MCP_TOOL_NAME_PREFIX)
   );
 }
+
+const STRUCTURED_OUTPUT_TOOL_NAME = 'StructuredOutput';
+const STRUCTURED_OUTPUT_ATTACHMENT_TYPE = 'structured_output';
+
+/**
+ * True when `key` holds the caller-defined result of a structured-output request: the `input` of
+ * the built-in `StructuredOutput` tool_use block, or the `data` of the `structured_output`
+ * attachment that echoes it (workflow and subagent runs; both shapes predate 2.1.280). Both are a JSON
+ * schema someone else wrote, so their field names are project vocabulary — a real run added about
+ * 25 business-domain names of a private project to the committed observations and
+ * TypeScript reference, though every value was redacted. Like isMcpToolUseInputKey above, `input`
+ * and `data` are ordinary field names elsewhere (Bash's own parameters, other attachments), so
+ * this is judgeable only from a SIBLING field (`name` / `type`), never from `key` alone.
+ */
+export function isStructuredOutputPayloadKey(container: Record<string, unknown>, key: string): boolean {
+  if (key === 'input') {
+    return container.type === 'tool_use' && container.name === STRUCTURED_OUTPUT_TOOL_NAME;
+  }
+  return key === 'data' && container.type === STRUCTURED_OUTPUT_ATTACHMENT_TYPE;
+}

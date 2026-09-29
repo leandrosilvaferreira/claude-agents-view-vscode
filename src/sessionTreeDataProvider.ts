@@ -3,13 +3,13 @@ import * as path from 'path';
 import * as os from 'os';
 import { Session, SubAgent } from './types';
 import { LogParser } from './logParser';
-import { LogFileRef, scanSessionFiles } from './sessionScanner';
+import { LogFileRef, isClaudeSessionFile, scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
 import { assembleVisibleSessions } from './sessionAssembly';
 import { upsertIfMoreRelevant } from './sessionDedupe';
 import { getOpenLogFiles } from './sessionActivity';
 import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
-import { KNOWN_COMPATIBLE_CLAUDE_VERSION, compareVersions, isNewerThanCompatible } from './claudeCompat';
+import { createClaudeCompatNotifier } from './claudeCompatNotice';
 import { getNestedSubAgentChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
 import { splitSubagentsByStatus } from './subagentGrouping';
 import { refreshSessionStatuses } from './sessionStatusRefresh';
@@ -44,7 +44,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   private monitoringEnabled = true;
   private refreshTimer: ReturnType<typeof setInterval> | undefined;
   // Warn only once per window when a newer-than-validated Claude Code version shows up in the logs.
-  private warnedClaudeVersion = false;
+  private notifyClaudeCompat = createClaudeCompatNotifier((msg) => void vscode.window.showWarningMessage(msg));
 
   private homeDir = os.homedir();
   private claudeProjectsPath = path.join(this.homeDir, '.claude', 'projects');
@@ -261,13 +261,19 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     }
     logDebug(`SessionTreeDataProvider: handleFileChange() for ${filePath} (${type})`);
     try {
-      const session = this.logParser.parse(filePath, type);
-      upsertIfMoreRelevant(this.sessions, session.id, session);
+      // The Claude watcher is recursive, so it also reports files that are not sessions (a
+      // subagent's transcript, a Workflow journal — see isClaudeSessionFile). A change to one of
+      // those still earns the status refresh below, since it is what shows a background agent
+      // working or finishing; it just must not register as a session of its own.
+      if (type !== CLAUDE_CODE_BRAND || isClaudeSessionFile(this.claudeProjectsPath, filePath)) {
+        const session = this.logParser.parse(filePath, type);
+        upsertIfMoreRelevant(this.sessions, session.id, session);
+      }
 
       // Check active status after change
       void this.updateActiveStatuses().then(() => {
         this._onDidChangeTreeData.fire();
-        logDebug(`SessionTreeDataProvider: handleFileChange() completed for ${session.id}`);
+        logDebug(`SessionTreeDataProvider: handleFileChange() completed for ${filePath}`);
       });
     } catch (err) {
       logDebug(`SessionTreeDataProvider: handleFileChange() failed with error: ${String(err)}`);
@@ -298,7 +304,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
       logDebug(`SessionTreeDataProvider: Failed to update active statuses: ${String(err)}`);
     }
 
-    this.checkClaudeVersionCompat();
+    this.notifyClaudeCompat(this.sessions.values());
   }
 
   private removeMissingCodexSessions(files: LogFileRef[]): void {
@@ -306,26 +312,6 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     for (const [id, session] of this.sessions) {
       if (session.type === 'codex' && !paths.has(session.logFilePath)) this.sessions.delete(id);
     }
-  }
-
-  // Warn once when a Claude Code newer than the validated version writes logs, so a format change
-  // can be re-checked instead of silently mis-parsing (renamed field → sessions vanish/mis-group).
-  private checkClaudeVersionCompat(): void {
-    if (this.warnedClaudeVersion) return;
-    let newest = '';
-    for (const session of this.sessions.values()) {
-      const v = session.claudeVersion;
-      if (v && isNewerThanCompatible(v) && (newest === '' || compareVersions(v, newest) > 0)) {
-        newest = v;
-      }
-    }
-    if (!newest) return;
-    this.warnedClaudeVersion = true;
-    const msg =
-      `Claude Code ${newest} detected; Agent Monitor was validated against ${KNOWN_COMPATIBLE_CLAUDE_VERSION}. ` +
-      `If sessions look wrong, the log format may have changed.`;
-    logDebug(`SessionTreeDataProvider: ${msg}`);
-    void vscode.window.showWarningMessage(msg);
   }
 
   /**
