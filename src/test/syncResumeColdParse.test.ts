@@ -106,7 +106,7 @@ describe('cold parse of a SendMessage-resumed foreground subagent', () => {
   it('stays stopped after its final completion (no rewake false positive)', () => {
     const session = new LogParser(tmp).parse(parentPath, 'claude-code');
     vi.setSystemTime(T0 + 460_000);
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
     expect(session.subagents.find((s) => s.agentId === 'aSYNC1')?.status).toBe('stopped');
   });
 });

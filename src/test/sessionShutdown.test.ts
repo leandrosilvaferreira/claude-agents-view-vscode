@@ -132,8 +132,8 @@ describe('a shut-down session never reads as working', () => {
       const now = SHUTDOWN_AT + 10 * 1000;
       const shutDown = parseAt(RAW.slice(0, 6), SHUTDOWN_AT, now);
       const control = parseAt(RAW.slice(0, 4), SHUTDOWN_AT, now);
-      expect(computeSessionStatus(control, new Set())).toBe('working');
-      expect(computeSessionStatus(shutDown, new Set())).toBe('stopped');
+      expect(computeSessionStatus(control)).toBe('working');
+      expect(computeSessionStatus(shutDown)).toBe('stopped');
     } finally {
       vi.useRealTimers();
     }
@@ -150,17 +150,8 @@ describe('a shut-down session never reads as working', () => {
       const now = SHUTDOWN_AT + 5 * 60 * 1000;
       const shutDown = parseAt([prompt, RAW[4], RAW[5]], SHUTDOWN_AT, now);
       const control = parseAt([prompt], SHUTDOWN_AT, now);
-      expect(computeSessionStatus(control, new Set())).toBe('working');
-      expect(computeSessionStatus(shutDown, new Set())).toBe('stopped');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('still trusts lsof: a transcript held open is alive regardless of the marker', () => {
-    try {
-      const session = parseAt(RAW.slice(0, 6), SHUTDOWN_AT, SHUTDOWN_AT + 5 * 60 * 1000);
-      expect(computeSessionStatus(session, new Set([path.normalize(session.logFilePath)]))).toBe('working');
+      expect(computeSessionStatus(control)).toBe('working');
+      expect(computeSessionStatus(shutDown)).toBe('stopped');
     } finally {
       vi.useRealTimers();
     }
@@ -170,7 +161,7 @@ describe('a shut-down session never reads as working', () => {
     // The screenshot's exact symptom, replayed through the per-tick refresh the tree uses.
     try {
       const session = parseAt(RAW.slice(0, 6), SHUTDOWN_AT, SHUTDOWN_AT + 25 * 60 * 1000);
-      refreshSessionStatuses([session], new Set());
+      refreshSessionStatuses([session]);
 
       const { working, completed } = splitSubagentsByStatus(session, []);
       expect(session.status).toBe('stopped');
@@ -283,7 +274,7 @@ describe('a shut-down session and a subagent that had already reported completio
       vi.useFakeTimers();
       vi.setSystemTime(DONE_AT + 90_000);
       const session = new LogParser(tmp).parse(parent, 'claude-code');
-      refreshSessionStatuses([session], new Set());
+      refreshSessionStatuses([session]);
       return session.subagents.find((s) => s.id === BACKGROUND);
     } finally {
       vi.useRealTimers();
@@ -326,7 +317,7 @@ describe('a shut-down session that is later resumed in place', () => {
       fs.writeFileSync(parent, [RAW[0], RAW[1], RAW[4], RAW[5], RAW[6]].join('\n') + '\n');
 
       const session = new LogParser(tmp).parse(parent, 'claude-code');
-      refreshSessionStatuses([session], new Set());
+      refreshSessionStatuses([session]);
 
       expect(session.shutdownRecorded).toBe(false); // resumed: the latch cleared
       const [parentAgent] = session.subagents;
@@ -383,7 +374,7 @@ describe('a subagent of a shut-down session that is resumed by SendMessage after
       };
       fs.appendFileSync(parent, [sendMessage, resumeAck].map((l) => JSON.stringify(l)).join('\n') + '\n');
       const session = parser.parse(parent, 'claude-code');
-      refreshSessionStatuses([session], new Set());
+      refreshSessionStatuses([session]);
 
       const [parentAgent] = session.subagents;
       expect(parentAgent.status).toBe('working');
@@ -409,9 +400,9 @@ describe('an ended session never reads as error', () => {
       const now = SHUTDOWN_AT + 5 * 60 * 1000;
       const alive = parseAt([apiError], SHUTDOWN_AT, now);
       const ended = parseAt([apiError, RAW[4], RAW[5]], SHUTDOWN_AT, now);
-      expect(computeSessionStatus(alive, new Set())).toBe('error');
+      expect(computeSessionStatus(alive)).toBe('error');
       expect(ended.lastEntryIsApiError).toBe(true);
-      expect(computeSessionStatus(ended, new Set())).toBe('stopped');
+      expect(computeSessionStatus(ended)).toBe('stopped');
     } finally {
       vi.useRealTimers();
     }

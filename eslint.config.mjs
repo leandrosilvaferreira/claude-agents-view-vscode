@@ -204,6 +204,44 @@ export default defineConfig(
       ],
     },
   },
+  // Activity detection is event-driven (watcher events + transcript mtime, see CHANGELOG 0.6.0).
+  // Its predecessor shelled out to `lsof` on every watcher event and on every tick: 251,510 runs
+  // in two days, none of which ever returned a file. Banning `child_process` outright keeps an
+  // external binary from creeping back in — the extension has to work on macOS, Linux and Windows
+  // with nothing installed. `node:child_process` is a separate module specifier, so it is listed
+  // on its own. `no-restricted-imports` only sees static imports and re-exports, so the routes around
+  // it are closed separately: a dynamic `import()` by the `ImportExpression` selector (every one,
+  // since `import(name)` has no specifier to match), `createRequire` and `cluster` by an import of
+  // `module` / `cluster`, and `require()` is already rejected by `@typescript-eslint/no-require-imports`.
+  // A type-position `import('./x').Type` is a different AST node and keeps working. Not covered: VS
+  // Code's own terminal and task APIs, which run commands without touching any of these modules.
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['child_process', 'node:child_process'].map((name) => ({
+            name,
+            message: 'Spawning external processes is banned: activity detection is event-driven (see CHANGELOG 0.6.0)',
+          })),
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression',
+          message:
+            'Dynamic import() is banned under src: it would get around the child_process ban (see CHANGELOG 0.6.0). Use a static import.',
+        },
+        {
+          selector: 'ImportDeclaration[source.value=/^(node:)?(module|cluster)$/]',
+          message:
+            'Importing module (createRequire) or cluster is banned: both get around the child_process ban (see CHANGELOG 0.6.0).',
+        },
+      ],
+    },
+  },
   // VS Code's `TreeDataProvider` contract types its change event as
   // `Event<T | undefined | null | void>`; the `| void` is what makes `fire()`
   // callable with no argument, so this layer can't satisfy `no-invalid-void-type`.

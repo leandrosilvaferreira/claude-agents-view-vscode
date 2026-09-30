@@ -41,11 +41,6 @@ vi.mock('vscode', () => ({
   },
 }));
 
-vi.mock('../sessionActivity', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../sessionActivity')>()),
-  getOpenLogFiles: () => Promise.resolve(new Set<string>()),
-}));
-
 import { SessionTreeDataProvider } from '../sessionTreeDataProvider';
 import { BrandTreeItem, SubAgentTreeItem } from '../treeItems';
 

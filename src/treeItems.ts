@@ -49,6 +49,51 @@ export class BrandTreeItem extends vscode.TreeItem {
   }
 }
 
+/**
+ * The rows at the root of the tree for the provider's current state (extracted from
+ * sessionTreeDataProvider.ts's getRootItems purely to keep that file under its line budget). The
+ * visible sessions are fetched lazily, so nothing is assembled while monitoring is off or loading.
+ */
+export function buildRootItems(
+  state: { monitoringEnabled: boolean; loading: boolean },
+  getVisibleSessions: () => Session[],
+): Array<BrandTreeItem | MessageTreeItem> {
+  // Monitoring turned off via the toggle / setting — make it obvious it's intentional.
+  if (!state.monitoringEnabled) {
+    return [new MessageTreeItem('Monitoring disabled', 'circle-slash', 'Click the eye icon at the top to re-enable')];
+  }
+  // Still within the startup delay / first load — show an animated placeholder
+  // instead of a blank view so it never looks broken.
+  if (state.loading) {
+    return [new MessageTreeItem('Loading sessions…', 'loading~spin', 'Reading local agent sessions')];
+  }
+
+  // Brand nodes (only shown when active sessions exist for that brand).
+  const filteredSessions = getVisibleSessions();
+  const brands: BrandTreeItem[] = [];
+  const claudeSessions = filteredSessions.filter((s) => s.type === 'claude-code');
+  const antigravitySessions = filteredSessions.filter((s) => s.type === 'antigravity');
+  const codexSessions = filteredSessions.filter((s) => s.type === 'codex');
+  if (claudeSessions.length > 0) {
+    brands.push(new BrandTreeItem('claude-code', claudeSessions));
+  }
+  if (antigravitySessions.length > 0) {
+    brands.push(new BrandTreeItem('antigravity', antigravitySessions));
+  }
+  if (codexSessions.length > 0) brands.push(new BrandTreeItem('codex', codexSessions));
+
+  if (brands.length === 0) {
+    return [
+      new MessageTreeItem(
+        'No active sessions',
+        'inbox',
+        'No Claude Code, Antigravity or Codex sessions in the last hour',
+      ),
+    ];
+  }
+  return brands;
+}
+
 export class SessionTreeItem extends vscode.TreeItem {
   constructor(public readonly session: Session) {
     super(session.projectName, vscode.TreeItemCollapsibleState.Expanded);

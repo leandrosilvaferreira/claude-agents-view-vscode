@@ -1,18 +1,20 @@
 import { Session } from './types';
-import { computeSessionStatus } from './sessionActivity';
+import { RECENT_WRITE, computeSessionStatus } from './sessionActivity';
 import { applyNestedAgentLiveness } from './sessionDedupe';
 import { refreshNestedSubagents } from './nestedSubagents';
 import { enrichSubagentMetadata } from './subagentMetadata';
 import { refreshRewokenSubagents } from './subagentRewake';
 
 /**
- * Per-tick refresh of every known session's status and subagent metadata. Called from
- * sessionTreeDataProvider.ts's updateActiveStatuses() on every 15s auto-refresh tick
- * (startAutoRefresh) and every file-change-triggered refresh (handleFileChange, loadSessions).
- * `openFiles` is injected (the caller resolves it via sessionActivity.ts's getOpenLogFiles, an
- * `lsof`-backed async lookup) so this function itself stays synchronous and vscode-free — the
- * same "inject what needs real I/O, keep the orchestration pure and testable" split
- * sessionAssembly.ts's assembleVisibleSessions uses for its own activePaths/now parameters.
+ * Refresh of every known session's status and subagent metadata. Called from
+ * sessionTreeDataProvider.ts's updateActiveStatuses() on every full scan (loadSessions: the poll
+ * tick, whose period is the user's `pollIntervalSeconds`; a manual refresh; the first load) and on
+ * every coalesced watcher flush (flushFileChanges).
+ * `activityWindowMs` is the user's activity window: the caller owns that setting and passes it on
+ * every call, so this function itself stays synchronous and vscode-free — the same "inject what
+ * the caller owns, keep the orchestration pure and testable" split sessionAssembly.ts's
+ * assembleVisibleSessions uses for its own activePaths/now parameters. It is forwarded untouched
+ * to computeSessionStatus.
  *
  * Three things happen per non-Codex session, in an order that matters, and all three run BEFORE
  * `session.status` is computed:
@@ -42,21 +44,21 @@ import { refreshRewokenSubagents } from './subagentRewake';
  * `session.status = computeSessionStatus(...)` runs LAST, after all three: its hasRunningAgents
  * check reads `sub.status` straight off `session.subagents`, so computing it any earlier would
  * miss a subagent step 2 just flipped back to 'working' on this very tick, under-reporting the
- * session itself as 'stopped' for one more 15s cycle.
+ * session itself as 'stopped' for one more refresh cycle.
  *
  * applyNestedAgentLiveness runs once after the loop, across all sessions: computeSessionStatus
  * only sees same-file subagents, so this folds in cross-file nested agents (background agents in
  * their own transcript, matched by project+branch) so a launcher doesn't render 'stopped' while
  * its own "Working Agents" group shows a live child.
  */
-export function refreshSessionStatuses(sessions: Session[], openFiles: Set<string>): void {
+export function refreshSessionStatuses(sessions: Session[], activityWindowMs: number = RECENT_WRITE): void {
   for (const session of sessions) {
     if (session.type !== 'codex') {
       enrichSubagentMetadata(session);
       refreshRewokenSubagents(session);
       refreshNestedSubagents(session);
     }
-    session.status = computeSessionStatus(session, openFiles);
+    session.status = computeSessionStatus(session, activityWindowMs);
   }
   applyNestedAgentLiveness(sessions);
 }

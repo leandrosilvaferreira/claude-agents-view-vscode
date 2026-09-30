@@ -1,13 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { exec } from 'child_process';
-import { computeSessionStatus, getOpenLogFiles } from '../sessionActivity';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { computeSessionStatus, IDLE_CEILING } from '../sessionActivity';
 import { Session } from '../types';
-
-vi.mock('child_process', () => ({
-  exec: vi.fn((_command: string, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
-    callback(null, '', '');
-  }),
-}));
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 const THIRTY_ONE_MINUTES = 31 * 60 * 1000;
@@ -29,22 +22,16 @@ function session(overrides: Partial<Session> = {}): Session {
 }
 
 describe('computeSessionStatus', () => {
-  const noOpenFiles = new Set<string>();
-
-  it.each(['stopped', 'error'] as const)(
-    'honors explicit Codex %s despite recent writes and an open file',
-    (codexTurnStatus) => {
-      const codex = session({ type: 'codex', codexTurnStatus, lastInteractionTime: Date.now() });
-      expect(computeSessionStatus(codex, new Set([codex.logFilePath]))).toBe(codexTurnStatus);
-    },
-  );
+  it.each(['stopped', 'error'] as const)('honors explicit Codex %s despite recent writes', (codexTurnStatus) => {
+    const codex = session({ type: 'codex', codexTurnStatus, lastInteractionTime: Date.now() });
+    expect(computeSessionStatus(codex)).toBe(codexTurnStatus);
+  });
 
   it('keeps Codex active during a quiet in-progress turn but expires abandoned turns', () => {
-    expect(computeSessionStatus(session({ type: 'codex', codexTurnStatus: 'working' }), noOpenFiles)).toBe('working');
+    expect(computeSessionStatus(session({ type: 'codex', codexTurnStatus: 'working' }))).toBe('working');
     expect(
       computeSessionStatus(
         session({ type: 'codex', codexTurnStatus: 'working', lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES }),
-        noOpenFiles,
       ),
     ).toBe('stopped');
   });
@@ -53,13 +40,13 @@ describe('computeSessionStatus', () => {
     // Claude Code streams reasoning as its own thinking-only entry, so the transcript can sit
     // untouched for minutes mid-reply. Without this the sidebar showed the session as stopped
     // exactly while the user was watching it think.
-    const status = computeSessionStatus(session({ lastEntryIsThinking: true }), noOpenFiles);
+    const status = computeSessionStatus(session({ lastEntryIsThinking: true }));
 
     expect(status).toBe('working');
   });
 
   it('stops a quiet session whose last turn already produced its answer', () => {
-    const status = computeSessionStatus(session({ lastEntryIsThinking: false }), noOpenFiles);
+    const status = computeSessionStatus(session({ lastEntryIsThinking: false }));
 
     expect(status).toBe('stopped');
   });
@@ -71,11 +58,11 @@ describe('computeSessionStatus', () => {
       lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES,
     });
 
-    expect(computeSessionStatus(stale, noOpenFiles)).toBe('stopped');
+    expect(computeSessionStatus(stale)).toBe('stopped');
   });
 
   it('reports working right after a write, before any heuristic is consulted', () => {
-    const status = computeSessionStatus(session({ lastInteractionTime: Date.now() - 5_000 }), noOpenFiles);
+    const status = computeSessionStatus(session({ lastInteractionTime: Date.now() - 5_000 }));
 
     expect(status).toBe('working');
   });
@@ -85,11 +72,11 @@ describe('computeSessionStatus', () => {
       subagents: [{ id: 'toolu_1', name: 'explorer', task: 'map the codebase', status: 'working' }],
     });
 
-    expect(computeSessionStatus(withAgent, noOpenFiles)).toBe('working');
+    expect(computeSessionStatus(withAgent)).toBe('working');
   });
 
   it('still reports working for a user turn awaiting a reply', () => {
-    const status = computeSessionStatus(session({ lastEntryType: 'user' }), noOpenFiles);
+    const status = computeSessionStatus(session({ lastEntryType: 'user' }));
 
     expect(status).toBe('working');
   });
@@ -99,7 +86,7 @@ describe('computeSessionStatus', () => {
     // can't tell it apart from a real prompt still awaiting a reply — that's what
     // lastEntryIsInterruption is for. Without it, an interrupted session read as 'working' for
     // up to IDLE_CEILING (30 min) after the user killed it.
-    const status = computeSessionStatus(session({ lastEntryType: 'user', lastEntryIsInterruption: true }), noOpenFiles);
+    const status = computeSessionStatus(session({ lastEntryType: 'user', lastEntryIsInterruption: true }));
 
     expect(status).toBe('stopped');
   });
@@ -113,7 +100,6 @@ describe('computeSessionStatus', () => {
         lastEntryIsInterruption: true,
         subagents: [{ id: 'toolu_1', name: 'explorer', task: 'map the codebase', status: 'working' }],
       }),
-      noOpenFiles,
     );
 
     expect(status).toBe('working');
@@ -127,20 +113,13 @@ describe('computeSessionStatus', () => {
       lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES,
     });
 
-    expect(computeSessionStatus(stale, noOpenFiles)).toBe('stopped');
-  });
-
-  it('reports working when the log file is held open, whatever the heuristics say', () => {
-    const stale = session({ lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES });
-    const open = new Set([stale.logFilePath]);
-
-    expect(computeSessionStatus(stale, open)).toBe('working');
+    expect(computeSessionStatus(stale)).toBe('stopped');
   });
 
   it('reports an error status for an idle-but-not-abandoned session whose last signal was an api error', () => {
     // The core new case: distinguishes "finished cleanly" from "broke" for a session that sits
     // in the ambiguous window between RECENT_WRITE and IDLE_CEILING.
-    const status = computeSessionStatus(session({ lastEntryIsApiError: true }), noOpenFiles);
+    const status = computeSessionStatus(session({ lastEntryIsApiError: true }));
 
     expect(status).toBe('error');
   });
@@ -150,17 +129,9 @@ describe('computeSessionStatus', () => {
     // followed by an active retry should still read 'working', not 'error'.
     const status = computeSessionStatus(
       session({ lastEntryIsApiError: true, lastInteractionTime: Date.now() - 5_000 }),
-      noOpenFiles,
     );
 
     expect(status).toBe('working');
-  });
-
-  it('stays working while the log file is held open, even with the api-error flag set', () => {
-    const stale = session({ lastEntryIsApiError: true, lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES });
-    const open = new Set([stale.logFilePath]);
-
-    expect(computeSessionStatus(stale, open)).toBe('working');
   });
 
   it('falls back to stopped past the idle ceiling, even with the api-error flag set', () => {
@@ -171,7 +142,7 @@ describe('computeSessionStatus', () => {
       lastInteractionTime: Date.now() - THIRTY_ONE_MINUTES,
     });
 
-    expect(computeSessionStatus(stale, noOpenFiles)).toBe('stopped');
+    expect(computeSessionStatus(stale)).toBe('stopped');
   });
 
   it('lets a still-running subagent outrank a stale api-error reading on the parent', () => {
@@ -183,38 +154,51 @@ describe('computeSessionStatus', () => {
         lastEntryIsApiError: true,
         subagents: [{ id: 'toolu_1', name: 'explorer', task: 'map the codebase', status: 'working' }],
       }),
-      noOpenFiles,
     );
 
     expect(status).toBe('working');
   });
 });
 
-describe('getOpenLogFiles', () => {
-  const originalPlatform = process.platform;
+describe('computeSessionStatus activity window', () => {
+  // A pinned clock: the cases below sit close to the window edge, which a real clock would make
+  // flaky on a loaded machine.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-30T12:00:00.000Z'));
+  });
 
   afterEach(() => {
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
-    vi.mocked(exec).mockClear();
+    vi.useRealTimers();
   });
 
-  it('resolves to an empty set and never spawns a subprocess on win32 (no lsof there)', async () => {
-    // Regression test: lsof doesn't exist on Windows, so getOpenLogFiles must short-circuit
-    // before ever building a command or shelling out — spawning a doomed subprocess on every
-    // refresh would be wasted work at best.
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+  // An answered assistant turn with no subagents: no mid-turn or running-agent heuristic applies,
+  // so the window is the only thing that can read this session as 'working'.
+  function idleFor(idleMs: number, overrides: Partial<Session> = {}): Session {
+    return session({ lastEntryType: 'assistant', lastInteractionTime: Date.now() - idleMs, ...overrides });
+  }
 
-    const result = await getOpenLogFiles('/home/user');
-
-    expect(result).toEqual(new Set());
-    expect(exec).not.toHaveBeenCalled();
+  it('defaults to the 60s RECENT_WRITE window: 59s idle is working, 61s idle is stopped', () => {
+    expect(computeSessionStatus(idleFor(59_000))).toBe('working');
+    expect(computeSessionStatus(idleFor(61_000))).toBe('stopped');
   });
 
-  it('shells out to lsof on non-Windows platforms', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+  it('honors a shorter window: 45s idle is stopped under a 30s window', () => {
+    expect(computeSessionStatus(idleFor(45_000), 30_000)).toBe('stopped');
+  });
 
-    await getOpenLogFiles('/home/user');
+  it('honors a longer window: 200s idle is working under a 300s window', () => {
+    expect(computeSessionStatus(idleFor(200_000), 300_000)).toBe('working');
+  });
 
-    expect(exec).toHaveBeenCalledTimes(1);
+  it('treats a write exactly one window ago as idle: the window edge is exclusive', () => {
+    expect(computeSessionStatus(idleFor(29_999), 30_000)).toBe('working');
+    expect(computeSessionStatus(idleFor(30_000), 30_000)).toBe('stopped');
+  });
+
+  it('lets shutdownRecorded beat even the largest window the setting allows', () => {
+    // The shutdown snapshot is itself a fresh write, so any window wide enough to cover it would
+    // read the just-exited session as working were it not for the latch outranking the window.
+    expect(computeSessionStatus(idleFor(5_000, { shutdownRecorded: true }), IDLE_CEILING)).toBe('stopped');
   });
 });

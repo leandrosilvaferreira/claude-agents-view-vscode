@@ -59,7 +59,15 @@ dedupe/nest → render tree. All source lives under `src/`:
 - **extension.ts** — activation entrypoint; registers the tree view and commands, gates
   monitoring on the `claudeAgentsMonitor.enabled` setting.
 - **sessionTreeDataProvider.ts** — orchestrator and `TreeDataProvider`: owns the session map,
-  file watchers, the refresh timer, and active-status detection.
+  the monitor settings, the file watchers and the poll timer. Detection is event-driven: watcher
+  events are coalesced into one refresh per 500 ms window, and full scans never overlap.
+- **sessionFileWatchers.ts** — registers the file-system watchers for the Claude Code,
+  Antigravity and Codex log folders and reports which folders were registered for watching at
+  startup (a watcher the OS stops later is not reported — the periodic rescan still covers it).
+- **eventCoalescer.ts** / **singleFlight.ts** — batch a burst of watcher events into one flush,
+  and keep two scans from running at the same time.
+- **monitorSettings.ts** — clamps the `claudeAgentsMonitor.activityWindowSeconds` and
+  `claudeAgentsMonitor.pollIntervalSeconds` settings when they are read.
 - **sessionScanner.ts** — discovers Claude Code and Antigravity log files on disk.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads only
   appended bytes); delegates title, subagent, and project-path extraction.
@@ -76,9 +84,15 @@ dedupe/nest → render tree. All source lives under `src/`:
 
 Parsing and detection modules (`logParser`, `subagentDetector`, `subagentMetadata`,
 `sessionScanner`, `sessionActivity`, `sessionAssembly`, `sessionDedupe`,
-`projectPathResolver`, `nameExtractor`) never import `vscode` and are unit-tested under
-`src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`, and `treeItems.ts` touch the
-VS Code API.
+`projectPathResolver`, `nameExtractor`, `eventCoalescer`, `singleFlight`, `monitorSettings`)
+never import `vscode` and are unit-tested under `src/test/`; only `extension.ts`,
+`sessionTreeDataProvider.ts`, `sessionFileWatchers.ts`, `treeItems.ts`, and
+`subagentTreeChildren.ts` touch the VS Code API. Nothing under `src/` may spawn an external
+process, because activity is detected from file events, file timestamps and the transcript's own
+content (see the [changelog](../CHANGELOG.md)). ESLint enforces it: importing `child_process`
+(or `node:child_process`), any dynamic `import()`, `require()` and any import of `module`
+(`createRequire`) or `cluster` are all errors. VS Code's own terminal and task APIs are not
+covered by the rule, so a review has to catch them.
 
 ## Claude Code compatibility
 

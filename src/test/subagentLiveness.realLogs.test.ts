@@ -191,7 +191,7 @@ describe('subagent re-woken after its completion notification (real 2.1.278 capt
   // (matching candidateMetadataDirs' `claudeProjectsPath` expectation) plus one refresh tick.
   function parseAndTick(parser = new LogParser(tmp)): SubAgent | undefined {
     const session = parser.parse(parentPath, 'claude-code');
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
     return byAgentId(session.subagents, B.agentId);
   }
 
@@ -235,11 +235,11 @@ describe('subagent re-woken after its completion notification (real 2.1.278 capt
     touch(firstDone + 60_000);
 
     vi.setSystemTime(firstDone + 90_000);
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
     expect(byAgentId(session.subagents, B.agentId)?.status).toBe('working');
 
     vi.setSystemTime(firstDone + 60_000 + IDLE_CEILING + 60_000);
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
     expect(byAgentId(session.subagents, B.agentId)?.status).toBe('stopped');
   });
 
@@ -274,7 +274,7 @@ describe('subagent re-woken after its completion notification (real 2.1.278 capt
     touch(firstDone + 1_000);
     vi.setSystemTime(finalTurnAt + 90_000);
     const before = new LogParser(tmp).parse(parentPath, 'claude-code');
-    refreshSessionStatuses([before], new Set());
+    refreshSessionStatuses([before]);
     expect(byAgentId(before.subagents, B.agentId)?.status).toBe('stopped');
     expect(before.status).toBe('stopped');
 
@@ -282,7 +282,7 @@ describe('subagent re-woken after its completion notification (real 2.1.278 capt
     touch(firstDone + 60_000);
     vi.setSystemTime(finalTurnAt + 90_000);
     const session = new LogParser(tmp).parse(parentPath, 'claude-code');
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
 
     expect(byAgentId(session.subagents, B.agentId)?.status).toBe('working');
     expect(session.status).toBe('working');
@@ -315,12 +315,12 @@ describe('subagent re-woken after its completion notification (real 2.1.278 capt
     vi.setSystemTime(firstDone + 90_000);
     const parser = new LogParser(tmp);
     const session = parser.parse(parentPath, 'claude-code');
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
     expect(byAgentId(session.subagents, B.agentId)?.status).toBe('working');
 
     fs.rmSync(transcriptPath);
     vi.setSystemTime(firstDone + 120_000);
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
 
     expect(byAgentId(session.subagents, B.agentId)?.status).toBe('stopped');
   });
