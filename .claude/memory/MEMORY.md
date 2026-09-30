@@ -46,4 +46,6 @@
 
 - [vi.spyOn(fs) não vê `import * as fs`](architecture-vitest-spyon-default-fs-misses-namespace-import.md) — spy de `import fs` grava 0 chamadas de `import * as fs` e `not.toHaveBeenCalled` passa vazio; use `vi.mock('fs', importOriginal)`.
 
-- [Bot Codex revisa PR ~4 min depois e a cada commit](reference-codex-review-bot-em-prs.md) — 👀→👍 ou threads P1/P2; esperar antes do merge; Open VSX demora ~2-4 min a listar a versão nova.
+- [Bot Codex revisa PR ~4 min depois e a cada commit](reference-codex-review-bot-em-prs.md) — 👀→👍 ou threads P1/P2; esperar antes do merge (PRs #6/#7 saíram antes do review).
+
+- [Open VSX demora a listar a versão nova](reference-open-vsx-demora-listar-versao-nova.md) — API dá 404 e `latest` antigo por ~2-4 min após o release; não é falha, repetir a consulta.
