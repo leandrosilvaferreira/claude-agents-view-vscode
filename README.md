@@ -32,6 +32,8 @@ Last validated against **Claude Code 2.1.284** — see the [validation scope and
 
 Monitoring reads existing logs locally without modifying them. It needs no cloud account, API key or access to Codex's credential files or state database. It does not decrypt protected content.
 
+The extension also writes a diagnostic log, `claude-agents-monitor-debug.log`, to your operating system's temporary folder. It can include local file paths, session IDs and error messages. It is capped at 2 MB (one previous copy is kept as `claude-agents-monitor-debug.log.1`) and, on macOS and Linux, only your user account can read it.
+
 The sidebar can display real project names, paths and readable conversation excerpts from your logs. Check what is visible before sharing a screenshot; the example above uses fictional text.
 
 Status is inferred from persisted events and activity, so buffered writes or a crashed agent can delay a change. Completed sessions eventually leave the recent-activity view. Models and other details appear only when the underlying tool records them. Log formats can change between tool releases. For Claude Code, a one-time compatibility warning appears when a transcript reports a newer version than the parser's compatibility marker.

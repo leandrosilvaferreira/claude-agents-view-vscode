@@ -43,3 +43,5 @@
 - [Detecção de atividade sem processo externo](architecture-activity-detection-no-external-process.md) — lsof nunca achou arquivo (251 mil execuções, 0 acertos), removido na 0.6.0; watcher VS Code + mtime + tick, sem fs.watch recursivo.
 
 - [RTK reescreve npm run lint e pula jscpd](architecture-rtk-rewrites-npm-lint-skips-jscpd.md) — `rtk lint` roda só ESLint (falso verde); use `rtk proxy npm run lint` para pegar clones do jscpd.
+
+- [vi.spyOn(fs) não vê `import * as fs`](architecture-vitest-spyon-default-fs-misses-namespace-import.md) — spy de `import fs` grava 0 chamadas de `import * as fs` e `not.toHaveBeenCalled` passa vazio; use `vi.mock('fs', importOriginal)`.

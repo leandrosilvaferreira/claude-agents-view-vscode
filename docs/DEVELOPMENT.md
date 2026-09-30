@@ -22,7 +22,7 @@ extension loaded — it runs `npm run build` first automatically (the launch con
 
 ```bash
 npm install         # install dependencies
-npm run lint        # eslint .
+npm run lint        # eslint . && jscpd (duplication gate)
 npm run format      # prettier --write "src/**/*.ts"
 npx tsc --noEmit    # typecheck, no output emitted
 npm run test        # vitest run
@@ -109,6 +109,25 @@ When you validate the parser against a new Claude Code release:
 
 1. Bump `KNOWN_COMPATIBLE_CLAUDE_VERSION` in `src/claudeCompat.ts`.
 2. Update the "Last validated against" line in the [root README](../README.md).
+
+## Continuous integration
+
+`.github/workflows/ci.yml` (**CI**) runs on every pull request, on every push to `main`, and on
+demand (Actions tab, **CI**, **Run workflow**):
+
+- **`static`** (Ubuntu): `npm run lint` (ESLint plus the `jscpd` duplication gate) and
+  `npx tsc --noEmit`. Both are OS-agnostic, so they run once.
+- **`test (<os>)`**: `npm run test` and `npm run build` on Ubuntu, Windows and macOS. `fail-fast`
+  is off, so a failure on one OS never hides the results on the others.
+
+These are the canonical commands above, so run them locally before pushing. `release.yml` still
+re-verifies (lint, typecheck, tests) on Ubuntu right before publishing, but it is not the PR check.
+
+`.gitattributes` pins LF line endings on every checkout. Without it, Git for Windows' default
+`core.autocrlf=true` converts the working tree to CRLF, `prettier --check` flags every TypeScript
+file under `src/`, and a Windows-only test failure could be a line-ending artifact instead of a real
+platform difference. A Windows clone made before that file existed keeps its CRLF files until you
+re-clone it.
 
 ## Releasing
 
