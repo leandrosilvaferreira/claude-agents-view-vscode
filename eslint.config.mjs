@@ -70,7 +70,7 @@ export default defineConfig(
       prettier,
       'import-x': importX,
     },
-    // Every import-graph rule here (`no-cycle`, `no-restricted-paths`, and the
+    // Every import-graph rule in this file (`no-cycle`, `no-restricted-paths`, and the
     // `boundaries` policies below) is a no-op without a resolver that can turn an
     // extensionless `./treeItems` into `src/treeItems.ts` — they silently pass instead
     // of failing loudly, which is why each one is covered by a probe in
@@ -126,21 +126,6 @@ export default defineConfig(
       'import-x/no-duplicates': 'error',
       // A developer's absolute path (`/Users/<name>/...`) resolves only on that machine.
       'import-x/no-absolute-path': 'error',
-      // Cross-import validation: production code must never reach into test code.
-      // The layer rule (core must not import the VS Code layer) is enforced
-      // separately by `boundaries` below.
-      'import-x/no-restricted-paths': [
-        'error',
-        {
-          zones: [
-            {
-              target: './src/*.ts',
-              from: './src/test',
-              message: 'Production code must not import from src/test — move the shared helper into src/.',
-            },
-          ],
-        },
-      ],
 
       // Strict TypeScript / Clean Code
       // `max-params` is covered by the TS-aware variant below; the core `max-params`
@@ -160,6 +145,30 @@ export default defineConfig(
       // Numbers interpolate unambiguously; the rest of the family (objects, nullables,
       // `any`) stays banned so nothing stringifies to "[object Object]" in a log line.
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+    },
+  },
+  // Cross-import validation: production code (`src/*.ts`) must never reach into test code. The layer
+  // rule (core must not import the VS Code layer) is enforced separately by `boundaries` below.
+  // The scope sits in `files`, NOT in a glob `target`, on purpose. import-x calls
+  // `is-glob(path.resolve(basePath, target))` before it matches, and on Windows `<base>\src\*.ts`
+  // reads as an escaped `\*` — not a glob — so `target: './src/*.ts'` silently matched nothing there
+  // (the probe in `src/test/lintRules.test.ts` failed on windows-latest). `files` globs are normalised
+  // to `/` on every OS, and a directory `target` is checked with `path.relative`, which is OS-aware.
+  {
+    files: ['src/*.ts'],
+    rules: {
+      'import-x/no-restricted-paths': [
+        'error',
+        {
+          zones: [
+            {
+              target: './src',
+              from: './src/test',
+              message: 'Production code must not import from src/test — move the shared helper into src/.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Layer boundaries: the dependency arrow only ever points inward, at the core.

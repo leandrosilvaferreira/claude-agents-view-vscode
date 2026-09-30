@@ -55,6 +55,15 @@ describe('architectural lint rules', () => {
     expect(ruleIds).toContain('import-x/no-restricted-paths');
   });
 
+  // The zone's `target` is the whole of src/, so only the `files: ['src/*.ts']` scope of its config block keeps
+  // test code itself out of the restriction. No test imports a sibling helper yet, so nothing else would notice
+  // that scope widening — this probe does.
+  it('lets test code import other test code', async () => {
+    const ruleIds = await ruleIdsFor(`import './logParser.test';\n`, path.join(SRC, 'test', 'sessionScanner.test.ts'));
+
+    expect(ruleIds).not.toContain('import-x/no-restricted-paths');
+  });
+
   it('rejects absolute import paths, which resolve only on one machine', async () => {
     const ruleIds = await ruleIdsFor(`import '/abs/checkout/src/logger';\n`, path.join(SRC, 'treeItems.ts'));
 
