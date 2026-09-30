@@ -1,0 +1,30 @@
+# Line endings: the repo stores LF and every checkout gets LF, on every OS.
+#
+# Git for Windows defaults to core.autocrlf=true (the windows-latest CI runner included),
+# which rewrites every text file to CRLF on checkout. The fixture tests happen to tolerate
+# that, but `prettier --check` then flags every TypeScript file under src/ (its endOfLine
+# default is "lf") and the tracked shell scripts stop running under bash. With LF
+# everywhere, a Windows-only test failure is a real platform difference, never a
+# line-ending artifact.
+#
+# Every tracked blob is already LF, so adding this file renormalizes nothing.
+# When several patterns match a path the last one wins, so the specific rules go below
+# the catch-all.
+
+# Default: Git sniffs each file, stores text as LF, and checks it out as LF — eol=lf
+# overrides core.autocrlf and core.eol.
+* text=auto eol=lf
+
+# Transcript fixtures are split on "\n" and parsed by byte offset; force text + LF instead
+# of trusting content sniffing.
+*.jsonl text eol=lf
+
+# Vitest snapshots are golden masters; keep their bytes identical on every OS.
+*.snap text eol=lf
+
+# SVGs are XML text; LF keeps their bytes identical on every OS.
+*.svg text eol=lf
+
+# Images are binary: no line-ending conversion, no text diff or merge
+# (`binary` is shorthand for `-text -diff -merge`).
+*.png binary

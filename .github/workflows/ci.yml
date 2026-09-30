@@ -1,0 +1,82 @@
+name: CI
+
+# Runs on every pull request, on every push to main, and on demand. The static checks run
+# once; the tests run on the three OSes the extension ships for, so a Windows or macOS
+# failure shows up on the PR instead of in a user's bug report. release.yml still
+# re-verifies (ubuntu only) right before publishing; this workflow is the PR check.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same PR makes the previous run's result obsolete, so pull requests
+# cancel the superseded run. Runs on main and manual dispatches are never cancelled mid-run:
+# the newer one waits, so two quick merges or a dispatch cannot kill each other's run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Lint and typecheck are OS-agnostic, so one runner is enough — three copies would only
+  # add Windows noise to checks that cannot differ. `npm run lint` is `eslint . && jscpd`,
+  # so the duplication gate is part of it.
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Action versions and node version match release.yml (see the note there on why v7).
+      # persist-credentials: false stops checkout from leaving the job token set up for git,
+      # so npm lifecycle scripts cannot reuse it; nothing in this workflow pushes.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+  # The code reads transcripts, resolves paths and watches files, so the tests are the part
+  # that can really differ per OS. fail-fast is off: a Windows-only failure must not hide
+  # the Linux and macOS results. Every step is one plain npm command, so each runner's
+  # default shell (PowerShell on Windows) runs it as is; a step that needs POSIX syntax
+  # must set `shell: bash`.
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npm run test
+
+      # Proves the esbuild bundle builds on each OS. Only release.yml packages the .vsix, and
+      # only on ubuntu, so this is where a Windows or macOS build break would first show up.
+      - name: Build
+        run: npm run build
