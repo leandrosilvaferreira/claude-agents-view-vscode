@@ -6,8 +6,10 @@
 resources/screenshot*.png
 # Claude Code harness / dev tooling — must never ship in the extension bundle
 .claude/**
+.superpowers/**
 vault-obsidian/**
 graphify-out/**
+.playwright-mcp/**
 .github/**
 docs/**
 scripts/**

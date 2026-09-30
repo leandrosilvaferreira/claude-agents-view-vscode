@@ -22,7 +22,7 @@ extension loaded — it runs `npm run build` first automatically (the launch con
 
 ```bash
 npm install         # install dependencies
-npm run lint        # eslint .
+npm run lint        # eslint . && jscpd (duplication gate)
 npm run format      # prettier --write "src/**/*.ts"
 npx tsc --noEmit    # typecheck, no output emitted
 npm run test        # vitest run
@@ -59,7 +59,15 @@ dedupe/nest → render tree. All source lives under `src/`:
 - **extension.ts** — activation entrypoint; registers the tree view and commands, gates
   monitoring on the `claudeAgentsMonitor.enabled` setting.
 - **sessionTreeDataProvider.ts** — orchestrator and `TreeDataProvider`: owns the session map,
-  file watchers, the refresh timer, and active-status detection.
+  the monitor settings, the file watchers and the poll timer. Detection is event-driven: watcher
+  events are coalesced into one refresh per 500 ms window, and full scans never overlap.
+- **sessionFileWatchers.ts** — registers the file-system watchers for the Claude Code,
+  Antigravity and Codex log folders and reports which folders were registered for watching at
+  startup (a watcher the OS stops later is not reported — the periodic rescan still covers it).
+- **eventCoalescer.ts** / **singleFlight.ts** — batch a burst of watcher events into one flush,
+  and keep two scans from running at the same time.
+- **monitorSettings.ts** — clamps the `claudeAgentsMonitor.activityWindowSeconds` and
+  `claudeAgentsMonitor.pollIntervalSeconds` settings when they are read.
 - **sessionScanner.ts** — discovers Claude Code and Antigravity log files on disk.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads only
   appended bytes); delegates title, subagent, and project-path extraction.
@@ -76,9 +84,15 @@ dedupe/nest → render tree. All source lives under `src/`:
 
 Parsing and detection modules (`logParser`, `subagentDetector`, `subagentMetadata`,
 `sessionScanner`, `sessionActivity`, `sessionAssembly`, `sessionDedupe`,
-`projectPathResolver`, `nameExtractor`) never import `vscode` and are unit-tested under
-`src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`, and `treeItems.ts` touch the
-VS Code API.
+`projectPathResolver`, `nameExtractor`, `eventCoalescer`, `singleFlight`, `monitorSettings`)
+never import `vscode` and are unit-tested under `src/test/`; only `extension.ts`,
+`sessionTreeDataProvider.ts`, `sessionFileWatchers.ts`, `treeItems.ts`, and
+`subagentTreeChildren.ts` touch the VS Code API. Nothing under `src/` may spawn an external
+process, because activity is detected from file events, file timestamps and the transcript's own
+content (see the [changelog](../CHANGELOG.md)). ESLint enforces it: importing `child_process`
+(or `node:child_process`), any dynamic `import()`, `require()` and any import of `module`
+(`createRequire`) or `cluster` are all errors. VS Code's own terminal and task APIs are not
+covered by the rule, so a review has to catch them.
 
 ## Claude Code compatibility
 
@@ -95,6 +109,25 @@ When you validate the parser against a new Claude Code release:
 
 1. Bump `KNOWN_COMPATIBLE_CLAUDE_VERSION` in `src/claudeCompat.ts`.
 2. Update the "Last validated against" line in the [root README](../README.md).
+
+## Continuous integration
+
+`.github/workflows/ci.yml` (**CI**) runs on every pull request, on every push to `main`, and on
+demand (Actions tab, **CI**, **Run workflow**):
+
+- **`static`** (Ubuntu): `npm run lint` (ESLint plus the `jscpd` duplication gate) and
+  `npx tsc --noEmit`. Both are OS-agnostic, so they run once.
+- **`test (<os>)`**: `npm run test` and `npm run build` on Ubuntu, Windows and macOS. `fail-fast`
+  is off, so a failure on one OS never hides the results on the others.
+
+These are the canonical commands above, so run them locally before pushing. `release.yml` still
+re-verifies (lint, typecheck, tests) on Ubuntu right before publishing, but it is not the PR check.
+
+`.gitattributes` pins LF line endings on every checkout. Without it, Git for Windows' default
+`core.autocrlf=true` converts the working tree to CRLF, `prettier --check` flags every TypeScript
+file under `src/`, and a Windows-only test failure could be a line-ending artifact instead of a real
+platform difference. A Windows clone made before that file existed keeps its CRLF files until you
+re-clone it.
 
 ## Releasing
 

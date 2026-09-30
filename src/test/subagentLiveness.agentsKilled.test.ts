@@ -95,7 +95,7 @@ describe('agents_killed and the whole session status', () => {
       // result, well under IDLE_CEILING (30min) so the idle-timeout branch doesn't either.
       vi.setSystemTime(KILLED_AT + 5 * 60 * 1000);
       const session = new LogParser().parse(filePath, 'claude-code');
-      refreshSessionStatuses([session], new Set());
+      refreshSessionStatuses([session]);
 
       expect(session.subagents.find((s) => s.id === BACKGROUND)?.status).toBe('stopped');
       expect(session.status).not.toBe('working');

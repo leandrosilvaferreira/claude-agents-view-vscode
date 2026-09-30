@@ -70,7 +70,7 @@ export default defineConfig(
       prettier,
       'import-x': importX,
     },
-    // Every import-graph rule here (`no-cycle`, `no-restricted-paths`, and the
+    // Every import-graph rule in this file (`no-cycle`, `no-restricted-paths`, and the
     // `boundaries` policies below) is a no-op without a resolver that can turn an
     // extensionless `./treeItems` into `src/treeItems.ts` — they silently pass instead
     // of failing loudly, which is why each one is covered by a probe in
@@ -126,21 +126,6 @@ export default defineConfig(
       'import-x/no-duplicates': 'error',
       // A developer's absolute path (`/Users/<name>/...`) resolves only on that machine.
       'import-x/no-absolute-path': 'error',
-      // Cross-import validation: production code must never reach into test code.
-      // The layer rule (core must not import the VS Code layer) is enforced
-      // separately by `boundaries` below.
-      'import-x/no-restricted-paths': [
-        'error',
-        {
-          zones: [
-            {
-              target: './src/*.ts',
-              from: './src/test',
-              message: 'Production code must not import from src/test — move the shared helper into src/.',
-            },
-          ],
-        },
-      ],
 
       // Strict TypeScript / Clean Code
       // `max-params` is covered by the TS-aware variant below; the core `max-params`
@@ -160,6 +145,30 @@ export default defineConfig(
       // Numbers interpolate unambiguously; the rest of the family (objects, nullables,
       // `any`) stays banned so nothing stringifies to "[object Object]" in a log line.
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+    },
+  },
+  // Cross-import validation: production code (`src/*.ts`) must never reach into test code. The layer
+  // rule (core must not import the VS Code layer) is enforced separately by `boundaries` below.
+  // The scope sits in `files`, NOT in a glob `target`, on purpose. import-x calls
+  // `is-glob(path.resolve(basePath, target))` before it matches, and on Windows `<base>\src\*.ts`
+  // reads as an escaped `\*` — not a glob — so `target: './src/*.ts'` silently matched nothing there
+  // (the probe in `src/test/lintRules.test.ts` failed on windows-latest). `files` globs are normalised
+  // to `/` on every OS, and a directory `target` is checked with `path.relative`, which is OS-aware.
+  {
+    files: ['src/*.ts'],
+    rules: {
+      'import-x/no-restricted-paths': [
+        'error',
+        {
+          zones: [
+            {
+              target: './src',
+              from: './src/test',
+              message: 'Production code must not import from src/test — move the shared helper into src/.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Layer boundaries: the dependency arrow only ever points inward, at the core.
@@ -200,6 +209,44 @@ export default defineConfig(
               message: 'The parsing core must stay `vscode`-free so it can be unit-tested without the VS Code API.',
             },
           ],
+        },
+      ],
+    },
+  },
+  // Activity detection is event-driven (watcher events + transcript mtime, see CHANGELOG 0.6.0).
+  // Its predecessor shelled out to `lsof` on every watcher event and on every tick: 251,510 runs
+  // in two days, none of which ever returned a file. Banning `child_process` outright keeps an
+  // external binary from creeping back in — the extension has to work on macOS, Linux and Windows
+  // with nothing installed. `node:child_process` is a separate module specifier, so it is listed
+  // on its own. `no-restricted-imports` only sees static imports and re-exports, so the routes around
+  // it are closed separately: a dynamic `import()` by the `ImportExpression` selector (every one,
+  // since `import(name)` has no specifier to match), `createRequire` and `cluster` by an import of
+  // `module` / `cluster`, and `require()` is already rejected by `@typescript-eslint/no-require-imports`.
+  // A type-position `import('./x').Type` is a different AST node and keeps working. Not covered: VS
+  // Code's own terminal and task APIs, which run commands without touching any of these modules.
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['child_process', 'node:child_process'].map((name) => ({
+            name,
+            message: 'Spawning external processes is banned: activity detection is event-driven (see CHANGELOG 0.6.0)',
+          })),
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression',
+          message:
+            'Dynamic import() is banned under src: it would get around the child_process ban (see CHANGELOG 0.6.0). Use a static import.',
+        },
+        {
+          selector: 'ImportDeclaration[source.value=/^(node:)?(module|cluster)$/]',
+          message:
+            'Importing module (createRequire) or cluster is banned: both get around the child_process ban (see CHANGELOG 0.6.0).',
         },
       ],
     },

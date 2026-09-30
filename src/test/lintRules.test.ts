@@ -55,10 +55,77 @@ describe('architectural lint rules', () => {
     expect(ruleIds).toContain('import-x/no-restricted-paths');
   });
 
+  // The zone's `target` is the whole of src/, so only the `files: ['src/*.ts']` scope of its config block keeps
+  // test code itself out of the restriction. No test imports a sibling helper yet, so nothing else would notice
+  // that scope widening — this probe does.
+  it('lets test code import other test code', async () => {
+    const ruleIds = await ruleIdsFor(`import './logParser.test';\n`, path.join(SRC, 'test', 'sessionScanner.test.ts'));
+
+    expect(ruleIds).not.toContain('import-x/no-restricted-paths');
+  });
+
   it('rejects absolute import paths, which resolve only on one machine', async () => {
     const ruleIds = await ruleIdsFor(`import '/abs/checkout/src/logger';\n`, path.join(SRC, 'treeItems.ts'));
 
     expect(ruleIds).toContain('import-x/no-absolute-path');
+  });
+
+  // The two spellings are separate module specifiers, so each needs its own probe: banning only
+  // `child_process` would leave `node:child_process` wide open.
+  it('bans spawning external processes through child_process', async () => {
+    const ruleIds = await ruleIdsFor(
+      `import { execFile } from 'child_process';\nexport const probe: unknown = execFile;\n`,
+      path.join(SRC, 'logger.ts'),
+    );
+
+    expect(ruleIds).toContain('no-restricted-imports');
+  });
+
+  it('bans spawning external processes through node:child_process', async () => {
+    const ruleIds = await ruleIdsFor(
+      `import { execFile } from 'node:child_process';\nexport const probe: unknown = execFile;\n`,
+      path.join(SRC, 'logger.ts'),
+    );
+
+    expect(ruleIds).toContain('no-restricted-imports');
+  });
+
+  // no-restricted-imports sees static imports only. A dynamic import() is caught by a syntax selector
+  // instead, and every one is refused: `import(name)` has no specifier to match against.
+  it.each([
+    ['a literal child_process', `import('child_process')`],
+    ['a literal node:child_process', `import('node:child_process')`],
+    ['a computed specifier', `import(name)`],
+  ])('bans a dynamic import() of %s', async (_label, expression) => {
+    const ruleIds = await ruleIdsFor(
+      `export const probe = async (name: string): Promise<unknown> => ${expression};\n`,
+      path.join(SRC, 'logger.ts'),
+    );
+
+    expect(ruleIds).toContain('no-restricted-syntax');
+  });
+
+  // The other two routes around the child_process ban: createRequire (from `module`) can load it
+  // without an import statement, and `cluster` forks processes of its own. Each spelling is its own
+  // module specifier, like child_process above.
+  it.each(['module', 'node:module', 'cluster', 'node:cluster'])(
+    'bans importing %s, a route around the child_process ban',
+    async (specifier) => {
+      const ruleIds = await ruleIdsFor(
+        `import * as probe from '${specifier}';\nexport const reexported: unknown = probe;\n`,
+        path.join(SRC, 'logger.ts'),
+      );
+
+      expect(ruleIds).toContain('no-restricted-syntax');
+    },
+  );
+
+  // `import('./x').Type` names a type and loads nothing at runtime, so it is a different AST node than
+  // the dynamic import() expression and must keep passing (src/extension.ts uses it).
+  it('still allows a type-position import("./x") reference', async () => {
+    const ruleIds = await ruleIdsFor(`export type Probe = import('./types').Session;\n`, path.join(SRC, 'logger.ts'));
+
+    expect(ruleIds).not.toContain('no-restricted-syntax');
   });
 }, 30000);
 

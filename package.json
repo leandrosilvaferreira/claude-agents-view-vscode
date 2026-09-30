@@ -118,6 +118,22 @@
           "default": true,
           "scope": "application",
           "description": "Monitor Claude Code, Codex and Antigravity sessions. When disabled, the extension stops reading logs in every window/instance. Monitoring only resumes when you re-enable it (button at the top of the panel) or change this setting."
+        },
+        "claudeAgentsMonitor.activityWindowSeconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 10,
+          "maximum": 1800,
+          "scope": "application",
+          "description": "How many seconds after the last write to a Claude Code or Antigravity session's transcript the session still counts as working (Codex sessions ignore this setting); raise it if sessions flip to idle during long pauses. Status is re-checked on file events and every poll, so a session goes idle between this window and the window plus the poll interval, and a turn still in progress can keep it working for up to 30 minutes after the last write; takes effect immediately."
+        },
+        "claudeAgentsMonitor.pollIntervalSeconds": {
+          "type": "integer",
+          "default": 15,
+          "minimum": 10,
+          "maximum": 30,
+          "scope": "application",
+          "description": "How often, in seconds, the extension re-scans the transcript folders as a safety net, even when no file-system event arrives. It is also the only way activity is detected where file-system events are unavailable (for example when the operating system's file-watch limit is reached, or the transcripts live on a network drive). Takes effect immediately."
         }
       }
     }

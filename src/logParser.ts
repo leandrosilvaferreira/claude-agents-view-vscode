@@ -9,6 +9,7 @@ import { enrichSubagentMetadata } from './subagentMetadata';
 import { LogEntry } from './transcriptEntry';
 import { trackTurnSignals, trackApiErrorSignal, trackShutdownSignal } from './turnSignals';
 import { CodexLogParser } from './codexLogParser';
+import { readLinesInChunks, READ_CHUNK_BYTES, MAX_LINE_BYTES } from './chunkedLineReader';
 
 // Re-exported so existing importers (e.g. subagentDetector) keep resolving LogEntry from here.
 export type { LogEntry } from './transcriptEntry';
@@ -31,6 +32,11 @@ interface LogLineContext {
 
 const CLAUDE_CODE_BRAND = 'claude-code' as const;
 
+// A tuning option that is not a positive integer falls back to its default instead of failing.
+function positiveIntegerOr(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isInteger(value) && value >= 1 ? value : fallback;
+}
+
 export class LogParser {
   private codexParser = new CodexLogParser();
   // `seenToolUseIds` is subagentDetector.ts's re-appended-line guard (see its own doc comment):
@@ -42,9 +48,15 @@ export class LogParser {
   private cache = new Map<string, { lastReadOffset: number; session: Session; seenToolUseIds: Set<string> }>();
   private projectPaths = new ProjectPathResolver();
   private claudeProjectsPath: string;
+  private readonly readChunkBytes: number;
+  private readonly maxLineBytes: number;
 
-  constructor(claudeProjectsPath?: string) {
+  // `readChunkBytes` and `maxLineBytes` exist so tests can force chunk boundaries and oversize lines
+  // with tiny values; the extension always takes the defaults.
+  constructor(claudeProjectsPath?: string, options: Readonly<{ readChunkBytes?: number; maxLineBytes?: number }> = {}) {
     this.claudeProjectsPath = claudeProjectsPath ?? path.join(os.homedir(), '.claude', 'projects');
+    this.readChunkBytes = positiveIntegerOr(options.readChunkBytes, READ_CHUNK_BYTES);
+    this.maxLineBytes = positiveIntegerOr(options.maxLineBytes, MAX_LINE_BYTES);
   }
 
   public parse(filePath: string, type: Session['type']): Session {
@@ -89,36 +101,46 @@ export class LogParser {
     }
   }
 
-  /** Returns the byte offset the next read should resume from. */
+  /**
+   * Returns the byte offset the next read should resume from.
+   *
+   * The appended bytes are read in bounded chunks and decoded one line at a time
+   * (chunkedLineReader.ts), never as one Buffer and one string: a transcript of several hundred MB
+   * overflows V8's string limit (~512 MiB) that way, and the resulting error was swallowed into an
+   * empty session and retried on every tick. One line over `maxLineBytes` is dropped whole for the
+   * same reason, and the returned offset moves past it.
+   */
   private parseNewLines(ctx: NewLinesContext): number {
     const { filePath, fileSize, lastReadOffset, session, stats, seenToolUseIds } = ctx;
     const fd = fs.openSync(filePath, 'r');
-    const bufferSize = fileSize - lastReadOffset;
-    const buffer = Buffer.alloc(bufferSize);
 
     try {
-      fs.readSync(fd, buffer, 0, bufferSize, lastReadOffset);
-      const newContent = buffer.toString('utf8');
-
-      // Claude Code writes one line at a time; a chunk read mid-write can end partway through the
-      // line currently being flushed (no trailing '\n' yet). That fragment must not be parsed now:
-      // it either fails JSON.parse (silently dropped below) or, worse, could coincidentally parse
-      // as something else — and since the offset would already sit past it, the real entry is lost
-      // forever, because the next read starts after it, mid-JSON, and never resyncs. So hold the
-      // fragment back and don't advance the offset past it, leaving it to be re-read whole once the
-      // writer finishes the line.
-      const endsWithNewline = newContent.endsWith('\n');
-      const lines = newContent.split('\n');
-      const incompleteTail = endsWithNewline ? '' : (lines.pop() ?? '');
-
       const currentSubagents = new Map<string, SubAgent>();
       for (const sub of session.subagents) {
         currentSubagents.set(sub.id, sub);
       }
 
-      for (const line of lines) {
-        this.parseLogLine({ line, session, currentSubagents, stats, seenToolUseIds });
-      }
+      // Claude Code writes one line at a time; a chunk read mid-write can end partway through the
+      // line currently being flushed (no trailing '\n' yet). That fragment must not be parsed now:
+      // it either fails JSON.parse (silently dropped below) or, worse, could coincidentally parse
+      // as something else — and since the offset would already sit past it, the real entry is lost
+      // forever, because the next read starts after it, mid-JSON, and never resyncs. So
+      // readLinesInChunks holds the fragment back and returns the offset of its first BYTE, leaving
+      // it to be re-read whole once the writer finishes the line. Byte, not `.length` (UTF-16 code
+      // units): transcripts carry multibyte UTF-8 (accented text, emoji), so a char-counted retreat
+      // would land the next read mid-character instead of at the start of the held-back fragment.
+      const resumeOffset = readLinesInChunks(
+        {
+          fd,
+          start: lastReadOffset,
+          end: fileSize,
+          chunkBytes: this.readChunkBytes,
+          maxLineBytes: this.maxLineBytes,
+        },
+        (line) => {
+          this.parseLogLine({ line, session, currentSubagents, stats, seenToolUseIds });
+        },
+      );
 
       session.subagents = Array.from(currentSubagents.values());
       // Runs once per parseNewLines() call (i.e. only when this file actually grew), and only
@@ -126,10 +148,7 @@ export class LogParser {
       enrichSubagentMetadata(session);
       session.lastInteractionTime = stats.mtimeMs;
 
-      // Byte length, not `.length` (UTF-16 code units): transcripts carry multibyte UTF-8 (accented
-      // text, emoji), so a char-counted retreat would land the next read mid-character instead of
-      // at the start of the held-back fragment.
-      return fileSize - Buffer.byteLength(incompleteTail, 'utf8');
+      return resumeOffset;
     } finally {
       fs.closeSync(fd);
     }

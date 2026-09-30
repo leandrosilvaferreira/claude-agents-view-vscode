@@ -10,7 +10,7 @@ See your local **Claude Code**, **OpenAI Codex** and **Google Antigravity** sess
 - **Sessions and their agents** — working sessions appear first; expand a session to browse working and completed agents, including nested Codex subagents.
 - **Useful session details** — project, branch, session title, model and activity time when recorded by the tool.
 - **Agent details** — name, status, model and available task text. Codex agents can also show a separately labeled latest update from their own transcript.
-- **Live refresh** — file watchers pick up changes, with a 15-second periodic refresh as a fallback.
+- **Live refresh** — file-system events trigger a refresh, batched into half-second windows, with a periodic rescan as a safety net (every 15 seconds by default, configurable).
 - **Quick access** — open a session's log or project folder from its row; hover over an agent for its available details.
 - **Monitoring on your terms** — use the eye icon to pause or resume monitoring across editor windows.
 
@@ -24,13 +24,15 @@ See your local **Claude Code**, **OpenAI Codex** and **Google Antigravity** sess
 
 On Windows, `~` refers to your user home directory. For a custom Codex location, set `CODEX_HOME` in the environment used to launch the editor.
 
-The extension requires **VS Code 1.90 or later**, or a compatible editor such as Antigravity, and runs on macOS, Linux and Windows. At least one supported tool must have written local logs; the monitor does not start agents or create sessions.
+The extension requires **VS Code 1.90 or later**, or a compatible editor such as Antigravity, and runs on macOS, Linux and Windows. Detection needs no external tools on any of them: file-system events and file timestamps tell the monitor when a transcript was written, the transcript's own content (an unanswered prompt, a running subagent) decides the rest, and the extension never launches other programs. At least one supported tool must have written local logs; the monitor does not start agents or create sessions.
 
 Last validated against **Claude Code 2.1.284** — see the [validation scope and results](docs/claude-code-2.1.284-validation.md).
 
 ## Privacy and limitations
 
 Monitoring reads existing logs locally without modifying them. It needs no cloud account, API key or access to Codex's credential files or state database. It does not decrypt protected content.
+
+The extension also writes a diagnostic log, `claude-agents-monitor-debug.log`, to your operating system's temporary folder. It can include local file paths, session IDs and error messages. It is capped at 2 MB (one previous copy is kept as `claude-agents-monitor-debug.log.1`) and, on macOS and Linux, only your user account can read it.
 
 The sidebar can display real project names, paths and readable conversation excerpts from your logs. Check what is visible before sharing a screenshot; the example above uses fictional text.
 
@@ -72,8 +74,12 @@ The extension's ID is unchanged, so existing installations and settings continue
 | Setting | Default | Scope | Description |
 | --- | --- | --- | --- |
 | `claudeAgentsMonitor.enabled` | `true` | Application | Enable monitoring. Turning it off stops log reading across editor windows; turn it back on with the eye icon or this setting. |
+| `claudeAgentsMonitor.activityWindowSeconds` | `60` | Application | How long after a transcript's last write a Claude Code or Antigravity session still counts as working (10–1800). Status is re-checked on file events and on every poll, so a session goes idle between the window and the window plus the poll interval, and a turn still in progress can keep it working for up to 30 minutes after the last write. Raise it if sessions flip to idle during long pauses; lower it to see them go idle sooner. |
+| `claudeAgentsMonitor.pollIntervalSeconds` | `15` | Application | How often the transcript folders are rescanned as a safety net, even when no file-system event arrives (10–30). It is the only way activity is noticed where file events are unavailable, for example when the operating system's file-watch limit is reached or the transcripts live on a network drive. |
 
-The existing setting name is retained for compatibility and applies to **all three tools**.
+The `claudeAgentsMonitor` prefix is retained for compatibility. `enabled` and `pollIntervalSeconds` apply to **all three tools**; the activity window applies to Claude Code and Antigravity, because Codex status comes from its own turn events. Both tuning settings take effect without reloading the window.
+
+The **Agent Monitor** output channel (**View → Output**, then pick it from the dropdown) lists the folders registered for watching at startup, the detection strategy in use and the active settings, and says when polling is the only detection path. A watcher the operating system stops later is not reported — the periodic rescan still covers it. Check it first if a session does not show as working.
 
 ## Development and license
 

@@ -77,35 +77,27 @@ describe('refreshSessionStatuses', () => {
     const sub = makeFreshSubagent();
     const session = makeSession({ subagents: [sub] });
 
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
 
     expect(sub.agentId).toBe('real-agent-id');
     expect(sub.children).toHaveLength(1);
     expect(sub.children?.[0].name).toBe('general-purpose');
   });
 
-  it('computes status from openFiles and leaves a session with no subagents untouched, without throwing', () => {
-    // Past IDLE_CEILING (30 min) so computeSessionStatus's recency heuristics can't independently
-    // read either session as 'working' — isolates the assertion to what refreshSessionStatuses
-    // itself is responsible for: forwarding openFiles into computeSessionStatus for each session.
-    const longIdle = Date.now() - 31 * 60 * 1000;
-    const openSession = makeSession({
-      id: 'open-session',
-      logFilePath: path.join(claudeProjectsDir, 'open.jsonl'),
-      lastInteractionTime: longIdle,
-    });
-    const idleSession = makeSession({
-      id: 'idle-session',
-      logFilePath: path.join(claudeProjectsDir, 'idle.jsonl'),
-      lastInteractionTime: longIdle,
-    });
-    const openFiles = new Set([path.normalize(openSession.logFilePath)]);
+  it('forwards the activity window to computeSessionStatus, falling back to the 60s default', () => {
+    // 45s idle after an answered assistant turn, with no subagents: no mid-turn or running-agent
+    // heuristic applies, so the window is the only thing that can decide. That isolates the
+    // assertion to what refreshSessionStatuses itself is responsible for — forwarding the window.
+    // Every step below flips the status, so none of them can pass on a stale value.
+    const session = makeSession({ lastEntryType: 'assistant', lastInteractionTime: Date.now() - 45_000 });
 
-    expect(() => {
-      refreshSessionStatuses([openSession, idleSession], openFiles);
-    }).not.toThrow();
+    refreshSessionStatuses([session]);
+    expect(session.status).toBe('working');
 
-    expect(openSession.status).toBe('working');
-    expect(idleSession.status).toBe('stopped');
+    refreshSessionStatuses([session], 30_000);
+    expect(session.status).toBe('stopped');
+
+    refreshSessionStatuses([session], 60_000);
+    expect(session.status).toBe('working');
   });
 });

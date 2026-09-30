@@ -89,15 +89,14 @@ describe('CodexLogParser', () => {
     const parser = new CodexLogParser();
     expect(parser.parse(file)).toMatchObject({ projectPath: '/own', model: 'own-model' });
     expect(parser.parse(file).codexTurnStatus).toBeUndefined();
-    const openFiles = new Set([file]);
-    expect(computeSessionStatus(parser.parse(file), openFiles)).toBe('stopped');
+    expect(computeSessionStatus(parser.parse(file))).toBe('stopped');
     fs.appendFileSync(
       file,
       line('event_msg', { type: 'thread_settings_applied', thread_id: 'child' }) +
         line('event_msg', { type: 'task_started' }),
     );
     expect(parser.parse(file).codexTurnStatus).toBe('working');
-    expect(computeSessionStatus(parser.parse(file), openFiles)).toBe('working');
+    expect(computeSessionStatus(parser.parse(file))).toBe('working');
   });
 
   it('keeps terminal signals through token events, and resumes on a new task', () => {

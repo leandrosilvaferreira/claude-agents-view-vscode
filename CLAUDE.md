@@ -114,19 +114,63 @@ subagents → dedupe/nest → render tree. All source under `src/`:
 
 - **extension.ts** — VS Code entrypoint: `activate`/`deactivate`, registers the tree
   view + 5 commands, gates monitoring on the `claudeAgentsMonitor.enabled` setting,
-  delays the first scan ~10s so it doesn't race Claude Code for the log files.
+  delays the first scan ~10s so it doesn't race Claude Code for the log files. Also owns the
+  `Agent Monitor` OutputChannel (the provider's diagnostics sink) and reads the two tuning
+  settings through `normalizeMonitorSettings`, re-applying them live when they change.
 - **sessionTreeDataProvider.ts** — orchestrator + `TreeDataProvider`: owns the session
-  Map, file watchers, 15s refresh timer (delegates the per-session refresh work to
-  `sessionStatusRefresh.ts`), `lsof` active-status detection (macOS/Linux only), and
-  calls dedupe + background-agent nesting before feeding the tree.
-- **sessionStatusRefresh.ts** — the per-session refresh loop run on every 15s tick and
-  file-change refresh: subagent metadata enrichment, then rewake detection, then grandchild
+  Map, the `MonitorSettings`, the watchers (built by `sessionFileWatchers.ts`) and the poll
+  tick (`pollIntervalSeconds`, re-armed live by `applySettings`). Detection is event-driven
+  and spawns no external process: a watcher event is only buffered in an `eventCoalescer.ts`
+  window (`EVENT_COALESCE_MS` = 500 ms, exported from this module), and one flush parses each
+  dirty file once, runs ONE status refresh and ONE tree `fire()` — nothing is logged per event.
+  The full scan (tick, manual refresh, first load) runs through `singleFlight.ts`, so scans
+  never overlap. The per-session refresh work is delegated to `sessionStatusRefresh.ts` with
+  the user's activity window; dedupe + background-agent nesting run before the tree is fed. At
+  activation it sends `describeMonitoring`'s report to the `Agent Monitor` OutputChannel (and
+  `logDebug`); `applySettings` adds one line per settings change. Its three transcript roots
+  are built with `canonicalJoin` (`fsPath.ts`) once, at construction.
+- **sessionStatusRefresh.ts** — the per-session refresh loop run on every poll tick and every
+  coalesced watcher flush: subagent metadata enrichment, then rewake detection, then grandchild
   attachment, then status LAST — enrichment must run immediately before the other two so a
   freshly-available `agentId` is picked up the same tick, not the next transcript parse, and
   status must run after all three so a subagent flipped back to 'working' this tick counts
   (see its own doc comment). Extracted out of `sessionTreeDataProvider.ts` to stay under
   this repo's 350-line file budget and because vscode-free code here is directly
   unit-testable.
+- **sessionFileWatchers.ts** — the only place `vscode.workspace.createFileSystemWatcher` is
+  called: one `RelativePattern` watcher per Claude, Antigravity and Codex root (the first two
+  only once their directory exists; Codex is always registered). Returns a `WatcherStatus`
+  (`brand`, `root`, optional `problem`: missing directory / registration failure) per root
+  instead of logging, and logs nothing itself, least of all per event. `describeMonitoring`
+  turns the statuses + settings into the activation report the provider sends to the
+  `Agent Monitor` OutputChannel: platform, one line per root (watching, or not watched and why),
+  the strategy text (event-driven watchers + polling safety net, no external processes), the
+  activity window, and a polling-only "fallback active" line only when no root is watched.
+  Every path a watcher hands to a callback (`onChange`, `onCodexDelete`) goes through
+  `canonicalFsPath` (`fsPath.ts`).
+- **fsPath.ts** — `canonicalFsPath(filePath, platform = process.platform)` and
+  `canonicalJoin(...parts)` (`path.join` + the same canonicalization): on Windows, upper-cases
+  the single leading drive letter so the two spellings of one file agree — VS Code's
+  `Uri.fsPath` (always lower-case, `c:\…`) and what the scan builds from `os.homedir()` /
+  `CODEX_HOME` (normally `C:\…`, but a hand-set `CODEX_HOME` can be `d:\…`). UNC, relative and
+  empty strings are left alone, and on any other platform the path is returned untouched.
+  Applied at both ends — every `uri.fsPath` the watchers hand out, and the provider's three
+  transcript roots (every scanned path is built from them) — so path-keyed state (`LogParser`'s
+  byte-offset cache, the Codex delete `===` match) never sees two spellings of one file. Pure,
+  never throws, vscode-free.
+- **eventCoalescer.ts** — `createEventCoalescer(flush, delayMs)`: buffers keyed watcher events
+  and hands them over as ONE batch per window. The window opens at the FIRST event and is never
+  re-armed — a trailing-edge debounce would starve while a transcript is appended to
+  continuously — so latency is bounded by `delayMs`. A throwing `flush` is logged, never
+  rethrown (it runs from a timer). vscode-free.
+- **singleFlight.ts** — `singleFlight(task)`: two runs never overlap; calls arriving during a
+  run share ONE follow-up run, so a burst costs at most two. A rejected run never wedges the
+  lock; callers MUST attach a rejection handler. vscode-free.
+- **monitorSettings.ts** — `MonitorSettings` (`activityWindowMs`, `pollIntervalMs`) and the
+  pure `normalizeMonitorSettings`, which clamps the raw `claudeAgentsMonitor.*` values at read
+  time because a user can hand-edit settings.json past the manifest's min/max. The activity
+  window defaults to `RECENT_WRITE` and caps at `IDLE_CEILING`; `package.json` restates the
+  bounds and a test keeps the two in step. vscode-free.
 - **claudeCompatNotice.ts** — the "unvalidated Claude Code version" warning:
   `createClaudeCompatNotifier(notify)` warns once per provider when a session's
   `claudeVersion` is newer than the pinned `KNOWN_COMPATIBLE_CLAUDE_VERSION`
@@ -138,18 +182,41 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   before registering a changed file as a session — a Workflow run's `journal.jsonl` carries no
   `isSidechain` flag and would otherwise appear as a phantom session named `journal`.
 - **logParser.ts** — incremental JSONL parser (caches a per-file byte offset, reads
-  only appended bytes, plus a per-file `seenToolUseIds` set carried across those
-  incremental reads — subagentDetector.ts's guard against re-appended history lines);
-  builds a `Session`, delegates title, subagent and project-path extraction.
+  only appended bytes — in bounded `READ_CHUNK_BYTES` (8 MiB) chunks through
+  `chunkedLineReader.ts`, never as one Buffer/string — plus a per-file `seenToolUseIds`
+  set carried across those incremental reads — subagentDetector.ts's guard against
+  re-appended history lines); builds a `Session`, delegates title, subagent and
+  project-path extraction. `new LogParser(projectsDir, { readChunkBytes, maxLineBytes })`
+  shrinks the chunk and the line limit (tests only; an invalid value falls back to the
+  default).
+- **chunkedLineReader.ts** — `readLinesInChunks`: reads a byte range of an open file in
+  bounded chunks, splits on the raw newline BYTE (0x0A) and decodes each COMPLETE line
+  separately as UTF-8, so a multi-byte character straddling a chunk boundary can't be cut.
+  A line over `MAX_LINE_BYTES` (64 MiB) is dropped whole — its bytes are read and thrown away
+  as they stream past, never buffered, until its newline — and a line that cannot be decoded
+  is skipped; one byte-count-only debug line per call, never the path. Returns the resume
+  offset: the start of the trailing fragment that has no newline yet (byte-exact: never
+  inside a character, never negative), or the end of what was read when that ends on a
+  newline or inside a dropped line, so the cursor never passes a line still being written
+  and dropped bytes are never re-read. Memory is bounded by one chunk plus one line of at most
+  `MAX_LINE_BYTES`. A read error stops at the last complete line instead of throwing, so a
+  retry never feeds a line twice. Replaces the single `Buffer.alloc(fileSize - offset)` + one
+  `toString('utf8')` that overflowed V8's ~512 MiB string limit on transcripts of several
+  hundred MB. vscode-free.
 - **projectPathResolver.ts** — works out which project a transcript belongs to: Claude
   Code's `cwd` (preferred) or its ambiguous, POSIX-shaped encoded directory name (raw
   name on Windows until `cwd` self-corrects it), Antigravity's prose metadata /
   tool-call `Cwd`, else walks up for a project marker.
-- **sessionActivity.ts** — decides whether a session is still running (`lsof` on
-  macOS/Linux only, recent write, user turn awaiting a reply, thinking-only last turn,
-  or live subagents). One signal outranks all the heuristics: the CLI's `cost-state`
-  shutdown snapshot as the file's tail (`Session.shutdownRecorded`, `turnSignals.ts`) means
-  the process exited, so the session is 'stopped' at once — see `subagentCompletion.ts`.
+- **sessionActivity.ts** — decides whether a session is still running from file activity
+  alone (no process inspection, so it reads the same on macOS, Linux and Windows): a write
+  within the activity window (the transcript's mtime via `lastInteractionTime`; default
+  `RECENT_WRITE`, configurable up to `IDLE_CEILING`), a user turn awaiting a reply, a
+  thinking-only last turn, or live subagents. Neither CLI holds the transcript open between
+  appends, so a write is the only direct liveness signal. Codex sessions ignore the window
+  (their status comes from `codexTurnStatus`). One signal outranks all the heuristics: the
+  CLI's `cost-state` shutdown snapshot as the file's tail (`Session.shutdownRecorded`,
+  `turnSignals.ts`) means the process exited, so the session is 'stopped' at once — see
+  `subagentCompletion.ts`.
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
   Three Claude launch shapes, only one of which is a `tool_use`: classic `Agent` tool,
@@ -209,24 +276,49 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `sessionTreeDataProvider` uses instead of a raw `Map.set`, so a same-id stub left by
   Claude Code's native worktree-entry can never overwrite the real session).
 - **treeItems.ts** — the `vscode.TreeItem` subclasses (Brand/Session/SubAgentGroup/
-  SubAgent/Message) + model-badge and relative-time formatting.
+  SubAgent/Message) + model-badge and relative-time formatting, and `buildRootItems` (the
+  root rows, extracted from the provider's `getRootItems`).
 - **subagentTreeChildren.ts** — pure builders for the subagent and nested-subagent
-  (grandchild) tree levels, extracted from `sessionTreeDataProvider`.
+  (grandchild) tree levels, extracted from `sessionTreeDataProvider` — including
+  `getSessionGroupChildren`, the Working/Completed Agents folders under a session.
 - **types.ts** — the `Session` and `SubAgent` domain shapes.
-- **logger.ts** — best-effort debug append to a local file; never throws.
+- **logger.ts** — best-effort debug log in the OS temp dir; never throws and never logs about
+  itself. `createDebugLogger({ file, maxBytes })` is the testable factory behind `logDebug`:
+  capped at `MAX_LOG_BYTES` (2 MiB) with one `<file>.1` backup (a file at least twice the cap
+  is deleted instead), created 0600. Hardening is descriptor-based: it opens with
+  `O_NOFOLLOW | O_NONBLOCK` (POSIX; 0 elsewhere), then `fstat`s the descriptor on EVERY append
+  and refuses anything that is not a regular file with one link owned by the current user
+  (where the OS has uids) — a symlink, hard link, FIFO or foreign-owned file present at open
+  time is never written and the entry is silently dropped (a hard link planted between `open`
+  and `fstat` is a known, `fs.protected_hardlinks`-mitigated race). The first-use `fchmod` is on the descriptor too and runs
+  before any rotation, so a legacy 0644 log never becomes a world-readable `.1`. The size for
+  the rotation decision comes from that same fstat; rotation itself is by path (rename/unlink
+  never follow a link) and the reopened file is vetted again. Reads `fs.constants` at call
+  time, not import time: `projectPathResolver.test.ts` mocks `fs` and reaches this module
+  through `sidecarReader`.
 
 ## Conventions
 
 - **Parsing/scanning never throws** — wrap every `fs`/`JSON.parse` in try/catch that
   logs via `logDebug` and returns an empty/fallback value; a bad log line must never
   break the tree.
-- **Keep `vscode` out of the parsing core** — `logParser`, `subagentDetector`, `subagentCompletion`,
-  `subagentLaunchAck`, `claudeCompatNotice`, `subagentRewake`, `nameExtractor`, `sessionDedupe`,
-  `sessionScanner`, `projectPathResolver`, `sessionActivity` import no `vscode` and are
-  unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,
-  `treeItems.ts`, `subagentTreeChildren.ts` touch the VS Code API.
+- **Keep `vscode` out of the parsing core** — `logParser`, `chunkedLineReader`, `subagentDetector`,
+  `subagentCompletion`, `subagentLaunchAck`, `claudeCompatNotice`, `subagentRewake`,
+  `nameExtractor`, `sessionDedupe`, `sessionScanner`, `projectPathResolver`, `fsPath`,
+  `sessionActivity`, `singleFlight`, `eventCoalescer`, `monitorSettings` import no `vscode` and
+  are unit-tested in `src/test/`; only `extension.ts`, `sessionTreeDataProvider.ts`,
+  `sessionFileWatchers.ts`, `treeItems.ts`, `subagentTreeChildren.ts` touch the VS Code API
+  (`eslint.config.mjs`'s `VSCODE_LAYER_MODULES` enforces the split).
+- **No external processes** — `child_process` / `node:child_process`, dynamic `import()`,
+  `require()` and imports of `module` / `cluster` are lint-banned in `src/**`
+  (`no-restricted-imports` + `no-restricted-syntax`; VS Code's own terminal/task APIs are not
+  covered). Activity detection is event-driven (watcher events +
+  transcript mtime, polling as the safety net); never shell out to `lsof`, `ps` or anything
+  else. See CHANGELOG 0.6.0 for why.
 - **Parse incrementally** — `LogParser` caches a per-file byte offset and reads only
-  appended bytes; never re-read a whole transcript on refresh.
+  appended bytes; never re-read a whole transcript on refresh. Never load the appended region
+  as one Buffer/string either: read it in bounded chunks (`chunkedLineReader.ts`) — a
+  transcript of several hundred MB exceeds V8's ~512 MiB string limit.
 - **Dedupe/ranking stays deterministic and stable** (`isMoreRelevant`) so the tree
   never oscillates between refreshes — don't replace it with naive "newest wins".
 - **Comment every log-format quirk** (async-launch ACK vs real completion, sidechain

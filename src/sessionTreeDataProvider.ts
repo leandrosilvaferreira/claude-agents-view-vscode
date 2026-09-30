@@ -5,22 +5,34 @@ import { Session, SubAgent } from './types';
 import { LogParser } from './logParser';
 import { LogFileRef, isClaudeSessionFile, scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
+import { canonicalJoin } from './fsPath';
 import { assembleVisibleSessions } from './sessionAssembly';
 import { upsertIfMoreRelevant } from './sessionDedupe';
-import { getOpenLogFiles } from './sessionActivity';
-import { BrandTreeItem, MessageTreeItem, SessionTreeItem, SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
+import {
+  BrandTreeItem,
+  MessageTreeItem,
+  SessionTreeItem,
+  SubAgentGroupTreeItem,
+  SubAgentTreeItem,
+  buildRootItems,
+} from './treeItems';
 import { createClaudeCompatNotifier } from './claudeCompatNotice';
-import { getNestedSubAgentChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
-import { splitSubagentsByStatus } from './subagentGrouping';
+import { getNestedSubAgentChildren, getSessionGroupChildren, getSubAgentGroupChildren } from './subagentTreeChildren';
 import { refreshSessionStatuses } from './sessionStatusRefresh';
 import { assembleCodexHierarchy } from './codexHierarchy';
-import { createSessionFileWatchers } from './sessionFileWatchers';
+import { WatcherStatus, createSessionFileWatchers, describeMonitoring } from './sessionFileWatchers';
+import { createEventCoalescer } from './eventCoalescer';
+import { singleFlight } from './singleFlight';
+import { DEFAULT_MONITOR_SETTINGS, MonitorSettings } from './monitorSettings';
 
 type TreeItemType = BrandTreeItem | MessageTreeItem | SessionTreeItem | SubAgentGroupTreeItem | SubAgentTreeItem;
 
-// Session.type / BrandTreeItem.brand discriminator value for the Claude Code brand, shared by
-// the filter/construct/watch call sites below so they can't drift out of sync.
+// Session.type discriminator value for the Claude Code brand (the recursive-watcher guard in
+// flushFileChanges keys off it).
 const CLAUDE_CODE_BRAND = 'claude-code' as const;
+
+/** Watcher events landing within this long of the first one are handled as a single batch. */
+export const EVENT_COALESCE_MS = 500;
 
 export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItemType> {
   private _onDidChangeTreeData: vscode.EventEmitter<TreeItemType | undefined | null | void> = new vscode.EventEmitter<
@@ -46,10 +58,26 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   // Warn only once per window when a newer-than-validated Claude Code version shows up in the logs.
   private notifyClaudeCompat = createClaudeCompatNotifier((msg) => void vscode.window.showWarningMessage(msg));
 
-  private homeDir = os.homedir();
-  private claudeProjectsPath = path.join(this.homeDir, '.claude', 'projects');
-  private geminiBrainPath = path.join(this.homeDir, '.gemini', 'antigravity-ide', 'brain');
-  private codexSessionsPath = path.join(process.env.CODEX_HOME || path.join(this.homeDir, '.codex'), 'sessions');
+  // Watcher events wait here for EVENT_COALESCE_MS and are handled as one batch (flushFileChanges).
+  private coalescer = createEventCoalescer<Session['type']>((batch) => {
+    this.flushFileChanges(batch);
+  }, EVENT_COALESCE_MS);
+  // Every full scan (poll tick, manual refresh, first load) goes through here so two never overlap.
+  // loadSessions() is synchronous today, so this is a guard against overlapping triggers and a
+  // future async step in the scan, not the fix for a live race.
+  private runScan = singleFlight(() => this.loadSessions());
+  private settings: MonitorSettings;
+  private readonly diagnostics: (line: string) => void;
+
+  private claudeProjectsPath = canonicalJoin(os.homedir(), '.claude', 'projects');
+  private geminiBrainPath = canonicalJoin(os.homedir(), '.gemini', 'antigravity-ide', 'brain');
+  private codexSessionsPath = canonicalJoin(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'sessions');
+
+  /** `diagnostics` receives the lines the extension shows in its output channel. */
+  constructor(options: { settings?: MonitorSettings; diagnostics?: (line: string) => void } = {}) {
+    this.settings = options.settings ?? DEFAULT_MONITOR_SETTINGS;
+    this.diagnostics = options.diagnostics ?? (() => undefined);
+  }
 
   public isMonitoringEnabled(): boolean {
     return this.monitoringEnabled;
@@ -65,7 +93,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     this._onDidChangeTreeData.fire();
 
     try {
-      await this.loadSessions();
+      await this.runScan();
       logDebug('SessionTreeDataProvider: activateMonitoring() initial load completed');
     } catch (err) {
       logDebug(`SessionTreeDataProvider: activateMonitoring() load failed: ${String(err)}`);
@@ -73,10 +101,10 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
 
     this.loading = false;
     this.isReady = true;
-    this.setupFileWatchers();
-    this.setupCodexWatcher();
+    const statuses = this.setupFileWatchers();
     this.startAutoRefresh();
     this._onDidChangeTreeData.fire();
+    for (const line of describeMonitoring(statuses, this.settings)) this.report(line);
   }
 
   /** Turn monitoring off: dispose watchers, stop the timer, drop cached sessions. */
@@ -84,6 +112,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     this.monitoringEnabled = false;
     this.isReady = false;
     this.loading = false;
+    this.coalescer.cancel();
     this.disposeWatchers();
     this.stopAutoRefresh();
     this.sessions.clear();
@@ -92,8 +121,30 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   }
 
   public dispose(): void {
+    this.coalescer.cancel();
     this.stopAutoRefresh();
     this.disposeWatchers();
+  }
+
+  /**
+   * Adopt retuned settings at once: re-arm the tick and refresh now, so a new window shows without
+   * waiting for a tick. A monitor that is not running (startup delay, or switched off) only keeps
+   * the values: re-arming or scanning here would start monitoring through the back door.
+   */
+  public applySettings(settings: MonitorSettings): void {
+    this.settings = settings;
+    if (this.isReady) {
+      this.startAutoRefresh();
+      this.refresh();
+    }
+    const { activityWindowMs, pollIntervalMs } = settings;
+    this.report(`settings applied: activity window ${activityWindowMs / 1000}s, poll ${pollIntervalMs / 1000}s`);
+  }
+
+  /** Diagnostics reach the extension's output channel and the verbose debug log alike. */
+  private report(line: string): void {
+    logDebug(`SessionTreeDataProvider: ${line}`);
+    this.diagnostics(line);
   }
 
   private startAutoRefresh(): void {
@@ -101,7 +152,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     this.refreshTimer = setInterval(() => {
       logDebug('interval(): Auto-refresh triggered');
       this.refresh();
-    }, 15000);
+    }, this.settings.pollIntervalMs);
   }
 
   private stopAutoRefresh(): void {
@@ -116,10 +167,15 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
       return;
     }
     logDebug('SessionTreeDataProvider: refresh() requested');
-    void this.loadSessions().then(() => {
-      this._onDidChangeTreeData.fire();
-      logDebug('SessionTreeDataProvider: refresh() finished, onDidChangeTreeData fired');
-    });
+    // Ends in a catch on purpose: a rejected scan must be logged, and a bare `void` would hide it.
+    this.runScan()
+      .then(() => {
+        this._onDidChangeTreeData.fire();
+        logDebug('SessionTreeDataProvider: refresh() finished, onDidChangeTreeData fired');
+      })
+      .catch((err: unknown) => {
+        logDebug(`SessionTreeDataProvider: refresh() failed: ${String(err)}`);
+      });
   }
 
   public getTreeItem(element: TreeItemType): vscode.TreeItem {
@@ -135,20 +191,8 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
       const items = element.sessions.map((session) => new SessionTreeItem(session));
       return items;
     } else if (element instanceof SessionTreeItem) {
-      // Level 3: Working Agents / Completed Agents folders. Each subagent (own or nested) is
-      // bucketed by its own tracked status — see subagentGrouping.ts's doc comment for why the
-      // parent session's overall status must never override that.
-      const nested = this.nestedAgents.get(element.session.id) ?? [];
-      const { working, completed } = splitSubagentsByStatus(element.session, nested);
-
-      const groups: SubAgentGroupTreeItem[] = [];
-      if (working.length > 0) {
-        groups.push(new SubAgentGroupTreeItem('working', working, element.session));
-      }
-      if (completed.length > 0) {
-        groups.push(new SubAgentGroupTreeItem('completed', completed, element.session));
-      }
-      return groups;
+      // Level 3: Working Agents / Completed Agents folders (subagentTreeChildren.ts).
+      return getSessionGroupChildren(element.session, this.nestedAgents.get(element.session.id) ?? []);
     } else if (element instanceof SubAgentGroupTreeItem) {
       return getSubAgentGroupChildren(element); // Level 4 (subagentTreeChildren.ts)
     } else if (element instanceof SubAgentTreeItem) {
@@ -158,40 +202,9 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   }
 
   private getRootItems(): TreeItemType[] {
-    // Monitoring turned off via the toggle / setting — make it obvious it's intentional.
-    if (!this.monitoringEnabled) {
-      return [new MessageTreeItem('Monitoring disabled', 'circle-slash', 'Click the eye icon at the top to re-enable')];
-    }
-    // Still within the startup delay / first load — show an animated placeholder
-    // instead of a blank view so it never looks broken.
-    if (this.loading) {
-      return [new MessageTreeItem('Loading sessions…', 'loading~spin', 'Reading local agent sessions')];
-    }
-
-    // Brand nodes (only shown when active sessions exist for that brand).
-    const filteredSessions = this.getVisibleSessions();
-    const brands: BrandTreeItem[] = [];
-    const claudeSessions = filteredSessions.filter((s) => s.type === CLAUDE_CODE_BRAND);
-    const antigravitySessions = filteredSessions.filter((s) => s.type === 'antigravity');
-    const codexSessions = filteredSessions.filter((s) => s.type === 'codex');
-    if (claudeSessions.length > 0) {
-      brands.push(new BrandTreeItem(CLAUDE_CODE_BRAND, claudeSessions));
-    }
-    if (antigravitySessions.length > 0) {
-      brands.push(new BrandTreeItem('antigravity', antigravitySessions));
-    }
-    if (codexSessions.length > 0) brands.push(new BrandTreeItem('codex', codexSessions));
-
-    if (brands.length === 0) {
-      return [
-        new MessageTreeItem(
-          'No active sessions',
-          'inbox',
-          'No Claude Code, Antigravity or Codex sessions in the last hour',
-        ),
-      ];
-    }
-    return brands;
+    return buildRootItems({ monitoringEnabled: this.monitoringEnabled, loading: this.loading }, () =>
+      this.getVisibleSessions(),
+    );
   }
 
   /** Build the tree's top-level session list. Workspace scoping (which folders are open) is read
@@ -220,67 +233,69 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
     this.watchers = [];
   }
 
-  private setupFileWatchers(): void {
+  private setupFileWatchers(): WatcherStatus[] {
     logDebug('SessionTreeDataProvider: setupFileWatchers() started');
     this.disposeWatchers();
-    this.watchers = createSessionFileWatchers(
-      { claudeProjectsPath: this.claudeProjectsPath, geminiBrainPath: this.geminiBrainPath },
-      (filePath, type) => {
-        this.handleFileChange(filePath, type);
+    const { watchers, statuses } = createSessionFileWatchers(
+      {
+        claudeProjectsPath: this.claudeProjectsPath,
+        geminiBrainPath: this.geminiBrainPath,
+        codexSessionsPath: this.codexSessionsPath,
+      },
+      {
+        onChange: (filePath, type) => {
+          this.handleFileChange(filePath, type);
+        },
+        onCodexDelete: (filePath) => {
+          this.removeCodexSession(filePath);
+        },
       },
     );
+    this.watchers = watchers;
+    return statuses;
   }
 
-  private setupCodexWatcher(): void {
-    try {
-      const watcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(this.codexSessionsPath, '**/rollout-*.jsonl'),
-      );
-      watcher.onDidChange((uri) => {
-        this.handleFileChange(uri.fsPath, 'codex');
-      });
-      watcher.onDidCreate((uri) => {
-        this.handleFileChange(uri.fsPath, 'codex');
-      });
-      watcher.onDidDelete((uri) => {
-        for (const [id, session] of this.sessions) {
-          if (session.type === 'codex' && session.logFilePath === uri.fsPath) this.sessions.delete(id);
-        }
-        this._onDidChangeTreeData.fire();
-      });
-      this.watchers.push(watcher);
-    } catch (err) {
-      logDebug(`SessionTreeDataProvider: Failed to setup Codex watcher: ${String(err)}`);
+  private removeCodexSession(filePath: string): void {
+    for (const [id, session] of this.sessions) {
+      if (session.type === 'codex' && session.logFilePath === filePath) this.sessions.delete(id);
     }
+    this._onDidChangeTreeData.fire();
   }
 
+  /** Deliberately does no work and no logging per event: a transcript is appended to many times a
+   * second, so the event only joins the coalescing window. */
   private handleFileChange(filePath: string, type: Session['type']): void {
-    if (!this.monitoringEnabled || !this.isReady) {
-      logDebug(`SessionTreeDataProvider: handleFileChange() skipped for ${filePath}`);
-      return;
-    }
-    logDebug(`SessionTreeDataProvider: handleFileChange() for ${filePath} (${type})`);
-    try {
-      // The Claude watcher is recursive, so it also reports files that are not sessions (a
-      // subagent's transcript, a Workflow journal — see isClaudeSessionFile). A change to one of
-      // those still earns the status refresh below, since it is what shows a background agent
-      // working or finishing; it just must not register as a session of its own.
-      if (type !== CLAUDE_CODE_BRAND || isClaudeSessionFile(this.claudeProjectsPath, filePath)) {
-        const session = this.logParser.parse(filePath, type);
-        upsertIfMoreRelevant(this.sessions, session.id, session);
-      }
-
-      // Check active status after change
-      void this.updateActiveStatuses().then(() => {
-        this._onDidChangeTreeData.fire();
-        logDebug(`SessionTreeDataProvider: handleFileChange() completed for ${filePath}`);
-      });
-    } catch (err) {
-      logDebug(`SessionTreeDataProvider: handleFileChange() failed with error: ${String(err)}`);
-    }
+    if (!this.monitoringEnabled || !this.isReady) return;
+    this.coalescer.push(filePath, type);
   }
 
-  public async loadSessions(): Promise<void> {
+  /** One coalescing window's events: each dirty file is parsed once, then ONE status refresh and
+   * ONE tree refresh cover the batch. Synchronous on purpose — the coalescer cannot await it. */
+  private flushFileChanges(batch: ReadonlyMap<string, Session['type']>): void {
+    // The window can outlive monitoring: it may have been open when the provider was switched off.
+    if (!this.monitoringEnabled || !this.isReady) return;
+    for (const [filePath, type] of batch) {
+      try {
+        // The Claude watcher is recursive, so it also reports files that are not sessions (a
+        // subagent's transcript, a Workflow journal — see isClaudeSessionFile). A change to one of
+        // those still earns the status refresh below, since it is what shows a background agent
+        // working or finishing; it just must not register as a session of its own.
+        if (type !== CLAUDE_CODE_BRAND || isClaudeSessionFile(this.claudeProjectsPath, filePath)) {
+          const session = this.logParser.parse(filePath, type);
+          upsertIfMoreRelevant(this.sessions, session.id, session);
+        }
+      } catch (err) {
+        logDebug(`SessionTreeDataProvider: flushFileChanges() failed for ${filePath}: ${String(err)}`);
+      }
+    }
+    this.updateActiveStatuses();
+    this._onDidChangeTreeData.fire();
+    logDebug(`SessionTreeDataProvider: flushed ${batch.size} changed file(s)`);
+  }
+
+  /** The work is synchronous; the promise is what runScan (singleFlight) wraps, and what
+   * external callers can keep awaiting. */
+  public loadSessions(): Promise<void> {
     logDebug('SessionTreeDataProvider: loadSessions() started');
     const files = scanSessionFiles(this.claudeProjectsPath, this.geminiBrainPath, this.codexSessionsPath);
     this.removeMissingCodexSessions(files);
@@ -298,13 +313,14 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
 
     // Determine active statuses
     try {
-      await this.updateActiveStatuses();
+      this.updateActiveStatuses();
       logDebug('SessionTreeDataProvider: loadSessions() active status updates completed');
     } catch (err) {
       logDebug(`SessionTreeDataProvider: Failed to update active statuses: ${String(err)}`);
     }
 
     this.notifyClaudeCompat(this.sessions.values());
+    return Promise.resolve();
   }
 
   private removeMissingCodexSessions(files: LogFileRef[]): void {
@@ -315,19 +331,17 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   }
 
   /**
-   * Runs on every 15s auto-refresh tick (startAutoRefresh) and every file-change-triggered
-   * refresh (handleFileChange, loadSessions). `getOpenLogFiles` is the only part of this that
-   * needs to be here rather than in the pure helper: it shells out to `lsof`, so it stays async
-   * and colocated with the rest of this vscode-layer class. The actual per-session status and
-   * subagent-metadata refresh logic — including WHY enrichSubagentMetadata must run there
-   * immediately before refreshNestedSubagents on every tick, not only when a transcript is
-   * re-parsed — lives in sessionStatusRefresh.ts's refreshSessionStatuses; see that function's
-   * own doc comment.
+   * Runs on every full scan (loadSessions: the poll tick at `settings.pollIntervalMs`, a manual
+   * refresh, the first load) and on every coalesced watcher flush (flushFileChanges). It only
+   * snapshots the session map and never throws: a failure is logged and swallowed so one bad
+   * session can't break a watcher callback. The actual per-session status and subagent-metadata
+   * refresh logic — including WHY enrichSubagentMetadata must run there immediately before
+   * refreshNestedSubagents on every tick, not only when a transcript is re-parsed — lives in
+   * sessionStatusRefresh.ts's refreshSessionStatuses; see that function's own doc comment.
    */
-  private async updateActiveStatuses(): Promise<void> {
+  private updateActiveStatuses(): void {
     try {
-      const openFiles = await getOpenLogFiles(this.homeDir);
-      refreshSessionStatuses(Array.from(this.sessions.values()), openFiles);
+      refreshSessionStatuses(Array.from(this.sessions.values()), this.settings.activityWindowMs);
     } catch (err) {
       logDebug(`SessionTreeDataProvider: updateActiveStatuses() failed: ${String(err)}`);
     }

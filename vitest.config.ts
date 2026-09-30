@@ -32,7 +32,6 @@ export default defineConfig({
         'src/extension.ts',
         'src/sessionTreeDataProvider.ts',
         'src/treeItems.ts',
-        'src/logger.ts',
       ],
     },
   },

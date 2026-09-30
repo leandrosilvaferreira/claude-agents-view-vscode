@@ -1,17 +1,38 @@
-import * as path from 'path';
-import { exec } from 'child_process';
 import { Session } from './types';
-import { logDebug } from './logger';
+
+/**
+ * The DEFAULT activity window: a transcript written to within this long reads as 'working'. The
+ * single source of that default — computeSessionStatus and refreshSessionStatuses take the window
+ * as a parameter and fall back to this. Also imported by nestedSubagents.ts for its best-effort
+ * grandchild status (mtime of a child's sidecar), which keeps this fixed value rather than the
+ * configurable window: one definition of "recent" there, exported so it isn't duplicated as a
+ * second magic-number literal.
+ */
+export const RECENT_WRITE = 60 * 1000;
+// Also shared with nestedSubagents.ts: a grandchild's status has NO signal besides mtime (no
+// awaitingReply/isThinking/hasRunningAgents to fall back on the way computeSessionStatus below
+// does), so it needs the same generous ceiling this function uses for a session that's gone
+// quiet mid-turn — not the much tighter RECENT_WRITE, which is a "just wrote a moment ago"
+// signal for a DIFFERENT purpose. See nestedSubagents.ts's computeChildStatus.
+export const IDLE_CEILING = 30 * 60 * 1000;
+
+function computeCodexStatus(session: Session): Session['status'] {
+  if (session.codexTurnStatus !== 'working') return session.codexTurnStatus ?? 'stopped';
+  return Date.now() - session.lastInteractionTime < IDLE_CEILING ? 'working' : 'stopped';
+}
 
 /**
  * Decide whether a session is still running.
  *
- * `lsof` is the only positive proof, but neither Claude Code nor Antigravity keeps the transcript
- * file descriptor open between appends — in practice it returns nothing, so everything falls to
- * the heuristics below. On Windows `lsof` doesn't exist at all, so there the heuristics are the
- * only path. The old "modified in the last 30s" fallback alone marked a session
- * stopped during any quiet stretch: a backgrounded agent can run for minutes without the parent
- * transcript gaining a single line, which is exactly when the user is watching it work.
+ * Detection is file-activity based, with no process inspection: a transcript written to within
+ * `activityWindowMs` (its mtime, carried by `session.lastInteractionTime`) reads as working, the
+ * same way on every platform. Neither Claude Code nor Antigravity holds the transcript open
+ * between appends, so a write is the only direct liveness signal there is. The window defaults to
+ * RECENT_WRITE, is the caller's to configure, and is assumed to stay at or below IDLE_CEILING — a
+ * longer one would let the recent-write check below outrank the idle ceiling. Relying on a recent
+ * write alone would mark a session stopped during any quiet stretch: a backgrounded agent can run
+ * for minutes without the parent transcript gaining a single line, which is exactly when the user
+ * is watching it work.
  *
  * So: recent write, OR the last entry is a user turn (Claude owes a reply), OR the last turn is a
  * thinking-only block (Claude is mid-reply — its text/tool_use always arrives in a later entry),
@@ -38,37 +59,20 @@ import { logDebug } from './logger';
  * preceded the very call that then failed — a confirmed failure is a more truthful read than a
  * guess left over from an older turn.
  */
-// Shared with subagentMetadata.ts's best-effort grandchild status (mtime of a child's
-// sidecar-sibling .jsonl) — one definition of "recent" for the whole codebase, exported so it
-// isn't duplicated as a second magic-number literal there.
-export const RECENT_WRITE = 60 * 1000;
-// Also shared with subagentMetadata.ts: a grandchild's status has NO signal besides mtime (no
-// awaitingReply/isThinking/hasRunningAgents to fall back on the way computeSessionStatus below
-// does), so it needs the same generous ceiling this function uses for a session that's gone
-// quiet mid-turn — not the much tighter RECENT_WRITE, which is a "just wrote a moment ago"
-// signal for a DIFFERENT purpose. See subagentMetadata.ts's computeChildStatus.
-export const IDLE_CEILING = 30 * 60 * 1000;
-
-function computeCodexStatus(session: Session): Session['status'] {
-  if (session.codexTurnStatus !== 'working') return session.codexTurnStatus ?? 'stopped';
-  return Date.now() - session.lastInteractionTime < IDLE_CEILING ? 'working' : 'stopped';
-}
-
-export function computeSessionStatus(session: Session, openFiles: Set<string>): 'working' | 'stopped' | 'error' {
+export function computeSessionStatus(
+  session: Session,
+  activityWindowMs: number = RECENT_WRITE,
+): 'working' | 'stopped' | 'error' {
   if (session.type === 'codex') return computeCodexStatus(session);
-  if (openFiles.has(path.normalize(session.logFilePath))) {
-    return 'working';
-  }
   // The CLI's shutdown snapshot is the last thing a process writes — so the file is fresh (inside
-  // RECENT_WRITE) precisely when it has just exited, and every heuristic below would read that as
-  // alive. Its own latch (Session.shutdownRecorded) outranks them all, lsof aside: a process that
-  // does hold the transcript open has resumed it, whatever the tail of the file still says. An
-  // ended session reads plain 'stopped', never 'error': that alarm is for one that may recover.
+  // the activity window) precisely when it has just exited, and every heuristic below would read
+  // that as alive. Its own latch (Session.shutdownRecorded) outranks them all. An ended session
+  // reads plain 'stopped', never 'error': that alarm is for one that may recover.
   if (session.shutdownRecorded === true) {
     return 'stopped';
   }
   const idle = Date.now() - session.lastInteractionTime;
-  if (idle < RECENT_WRITE) {
+  if (idle < activityWindowMs) {
     return 'working';
   }
   if (idle >= IDLE_CEILING) {
@@ -90,44 +94,4 @@ export function computeSessionStatus(session: Session, openFiles: Set<string>): 
 function isMidTurn(session: Session): boolean {
   const awaitingReply = session.lastEntryType === 'user' && !session.lastEntryIsInterruption;
   return awaitingReply || session.lastEntryIsThinking === true;
-}
-
-/** Set of transcript files currently held open, per `lsof`. Scoped to ~/.claude and ~/.gemini to
- * avoid a full-system scan. Resolves to an empty set on any error (the heuristics cover the rest),
- * and on Windows, where `lsof` does not exist. */
-export function getOpenLogFiles(homeDir: string): Promise<Set<string>> {
-  // Windows has no `lsof`. Rather than spawn a doomed subprocess on every refresh, skip straight
-  // to the empty set — `computeSessionStatus` treats that exactly like the (already normal) case
-  // where lsof returns nothing, and its heuristics carry the whole detection there.
-  if (process.platform === 'win32') {
-    return Promise.resolve(new Set());
-  }
-  return new Promise((resolve) => {
-    const openFiles = new Set<string>();
-
-    const claudePath = path.join(homeDir, '.claude');
-    const geminiPath = path.join(homeDir, '.gemini');
-
-    // exec (shell) is used for the `lsof | grep` pipe. The only interpolated value is os.homedir(),
-    // which is trusted (not external input), so there is no injection surface here.
-    const cmd = `lsof -Fn "${claudePath}" "${geminiPath}" 2>/dev/null | grep -E '\\.jsonl$' || true`;
-
-    logDebug(`executing: getOpenLogFiles() cmd: ${cmd}`);
-    exec(cmd, (err, stdout) => {
-      if (err) {
-        logDebug(`lsof exec error: ${err.message}`);
-      }
-      if (stdout) {
-        const lines = stdout.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('n')) {
-            const filePath = line.substring(1).trim();
-            openFiles.add(path.normalize(filePath));
-          }
-        }
-      }
-      logDebug(`getOpenLogFiles(): Found ${openFiles.size} open log files in lsof`);
-      resolve(openFiles);
-    });
-  });
 }

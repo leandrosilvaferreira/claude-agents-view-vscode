@@ -1,10 +1,30 @@
+import { Session, SubAgent } from './types';
+import { splitSubagentsByStatus } from './subagentGrouping';
 import { SubAgentGroupTreeItem, SubAgentTreeItem } from './treeItems';
 
 /**
- * Children-list builders for the two subagent-facing tree levels (extracted from
- * sessionTreeDataProvider.ts's getChildren purely to keep that file under its line budget — both
- * functions are pure and only touch the TreeItem passed in, no provider state).
+ * Children-list builders for the subagent-facing tree levels (extracted from
+ * sessionTreeDataProvider.ts's getChildren purely to keep that file under its line budget — all
+ * functions are pure and only touch what they are passed, no provider state).
  */
+
+/**
+ * Level 3: the Working Agents / Completed Agents folders under a session. Each subagent (own or
+ * nested) is bucketed by its own tracked status — see subagentGrouping.ts's doc comment for why the
+ * parent session's overall status must never override that.
+ */
+export function getSessionGroupChildren(session: Session, nested: SubAgent[]): SubAgentGroupTreeItem[] {
+  const { working, completed } = splitSubagentsByStatus(session, nested);
+
+  const groups: SubAgentGroupTreeItem[] = [];
+  if (working.length > 0) {
+    groups.push(new SubAgentGroupTreeItem('working', working, session));
+  }
+  if (completed.length > 0) {
+    groups.push(new SubAgentGroupTreeItem('completed', completed, session));
+  }
+  return groups;
+}
 
 /** Level 4: subagents inside a Working/Completed group folder. */
 export function getSubAgentGroupChildren(element: SubAgentGroupTreeItem): SubAgentTreeItem[] {

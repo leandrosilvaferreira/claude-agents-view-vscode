@@ -166,7 +166,7 @@ describe('a true resume long after a stop clears stoppedAt', () => {
     expect(session.subagents.find((s) => s.agentId === AGENT)?.status).toBe('working');
 
     vi.setSystemTime(T1 + 60 * 60 * 1000); // 1h after the original stop
-    refreshSessionStatuses([session], new Set());
+    refreshSessionStatuses([session]);
 
     expect(session.subagents.find((s) => s.agentId === AGENT)?.status).toBe('working');
   });
