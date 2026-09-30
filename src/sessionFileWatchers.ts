@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import { canonicalFsPath } from './fsPath';
 import { MonitorSettings } from './monitorSettings';
 import { Session } from './types';
 
@@ -81,15 +82,17 @@ function watchRoot(spec: WatchedRoot, onChange: SessionFileHandlers['onChange'])
   }
   try {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, spec.glob));
+    // Every path leaving this boundary goes through canonicalFsPath: on Windows `uri.fsPath` lower-cases
+    // the drive letter, unlike the scan, and the callbacks' path-keyed state must see one spelling.
     const report = (uri: vscode.Uri): void => {
-      onChange(uri.fsPath, brand);
+      onChange(canonicalFsPath(uri.fsPath), brand);
     };
     watcher.onDidChange(report);
     watcher.onDidCreate(report);
     const { onDelete } = spec;
     if (onDelete) {
       watcher.onDidDelete((uri) => {
-        onDelete(uri.fsPath);
+        onDelete(canonicalFsPath(uri.fsPath));
       });
     }
     return { watcher, status: { brand, root, problem: exists ? undefined : MISSING_ROOT } };

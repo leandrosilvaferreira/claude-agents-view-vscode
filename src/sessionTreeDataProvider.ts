@@ -5,6 +5,7 @@ import { Session, SubAgent } from './types';
 import { LogParser } from './logParser';
 import { LogFileRef, isClaudeSessionFile, scanSessionFiles } from './sessionScanner';
 import { logDebug } from './logger';
+import { canonicalJoin } from './fsPath';
 import { assembleVisibleSessions } from './sessionAssembly';
 import { upsertIfMoreRelevant } from './sessionDedupe';
 import {
@@ -68,10 +69,9 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeItem
   private settings: MonitorSettings;
   private readonly diagnostics: (line: string) => void;
 
-  private homeDir = os.homedir();
-  private claudeProjectsPath = path.join(this.homeDir, '.claude', 'projects');
-  private geminiBrainPath = path.join(this.homeDir, '.gemini', 'antigravity-ide', 'brain');
-  private codexSessionsPath = path.join(process.env.CODEX_HOME || path.join(this.homeDir, '.codex'), 'sessions');
+  private claudeProjectsPath = canonicalJoin(os.homedir(), '.claude', 'projects');
+  private geminiBrainPath = canonicalJoin(os.homedir(), '.gemini', 'antigravity-ide', 'brain');
+  private codexSessionsPath = canonicalJoin(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'sessions');
 
   /** `diagnostics` receives the lines the extension shows in its output channel. */
   constructor(options: { settings?: MonitorSettings; diagnostics?: (line: string) => void } = {}) {
