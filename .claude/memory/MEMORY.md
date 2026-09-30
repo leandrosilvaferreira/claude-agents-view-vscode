@@ -46,6 +46,4 @@
 
 - [vi.spyOn(fs) não vê `import * as fs`](architecture-vitest-spyon-default-fs-misses-namespace-import.md) — spy de `import fs` grava 0 chamadas de `import * as fs` e `not.toHaveBeenCalled` passa vazio; use `vi.mock('fs', importOriginal)`.
 
-- [import-x no-restricted-paths morre no Windows](architecture-import-x-restricted-paths-glob-nao-dispara-no-windows.md) — `target` glob (`./src/*.ts`) vira escape em win32 e a regra não dispara; escopo em `files` + `target` de diretório.
-
-- [Fluxo PR → CI → bot Codex → merge → release](reference-fluxo-pr-ci-codex-release.md) — checks `static`+`test` (3 SOs); bot revisa ~4 min e a cada commit (👀→👍); squash; `release.yml` faz o bump.
+- [Bot Codex revisa PR ~4 min depois e a cada commit](reference-codex-review-bot-em-prs.md) — 👀→👍 ou threads P1/P2; esperar antes do merge; Open VSX demora ~2-4 min a listar a versão nova.
