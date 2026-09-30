@@ -49,3 +49,5 @@
 - [Bot Codex revisa PR ~4 min depois e a cada commit](reference-codex-review-bot-em-prs.md) — 👀→👍 ou threads P1/P2; esperar antes do merge (PRs #6/#7 saíram antes do review).
 
 - [Open VSX demora a listar a versão nova](reference-open-vsx-demora-listar-versao-nova.md) — API dá 404 e `latest` antigo por ~2-4 min após o release; não é falha, repetir a consulta.
+
+- [Não esperar o Codex indefinidamente para mergear](feedback-nao-esperar-codex-indefinidamente.md) — review reinicia a cada push; tratar as threads uma vez e mergear com CI verde.
