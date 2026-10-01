@@ -26,7 +26,7 @@ On Windows, `~` refers to your user home directory. For a custom Codex location,
 
 The extension requires **VS Code 1.90 or later**, or a compatible editor such as Antigravity, and runs on macOS, Linux and Windows. Detection needs no external tools on any of them: file-system events and file timestamps tell the monitor when a transcript was written, the transcript's own content (an unanswered prompt, a running subagent) decides the rest, and the extension never launches other programs. At least one supported tool must have written local logs; the monitor does not start agents or create sessions.
 
-Last validated against **Claude Code 2.1.284** — see the [validation scope and results](docs/claude-code-2.1.284-validation.md).
+Last validated against **Claude Code 2.1.286** — see the [validation scope and results](docs/claude-code-2.1.286-validation.md).
 
 ## Privacy and limitations
 
