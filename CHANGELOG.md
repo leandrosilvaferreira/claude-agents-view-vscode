@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-10-01
+
+### Changed
+
+- Validated against Claude Code 2.1.286 (the previous pin was 2.1.284), so the "unvalidated Claude Code version" warning no longer appears for 2.1.285 and 2.1.286. The transcript schema changed only additively and nothing the parser reads moved; see the [validation notes](docs/claude-code-2.1.286-validation.md).
+
 ## [0.6.0] - 2026-09-30
 
 ### Changed
