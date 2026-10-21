@@ -1,5 +1,4 @@
 .vscode/**
-.agents/**
 # README screenshots — vsce rewrites relative image paths in readme.md to
 # https://github.com/<repo>/raw/HEAD/..., so the store loads them from GitHub and
 # the packed copy would never be read. Only resources/icon.png must ship.

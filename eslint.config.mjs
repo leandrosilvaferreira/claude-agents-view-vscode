@@ -40,7 +40,6 @@ export default defineConfig(
       // Tooling outside the extension source (not in tsconfig) — the typed config
       // can't parse them and they follow their own conventions.
       '.claude/**',
-      '.agents/**',
       // Only this one file — not the whole scripts/** dir, so scripts/schema-gen/**
       // (its own scripts/tsconfig.json project) gets linted like everything else.
       'scripts/install-plugins.mjs',

@@ -52,7 +52,6 @@ coverage/
 
 .claude/
 docs/
-.agents/
 .code-review-graph/
 .superpowers/
 
