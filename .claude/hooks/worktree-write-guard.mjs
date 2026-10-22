@@ -56,11 +56,13 @@ const absTarget = path.isAbsolute(targetPath) ? targetPath : path.resolve(cwd, t
 // Allow writes inside the worktree (or to the worktree root itself).
 if (absTarget === wtPath || absTarget.startsWith(wtPath + path.sep)) process.exit(0);
 
-// Allow writes to temp dirs (the session scratchpad lives under /private/tmp): they are never the
-// project root this guard protects. Resolved first so a `..` segment cannot climb out of them.
+// Allow writes to temp dirs (the session scratchpad lives under /private/tmp), but never to the
+// project itself: a checkout can live under /tmp too (CI, scratch clones). Resolved first so a
+// `..` segment cannot climb out of them.
+const isWithin = (target, root) => target === root || target.startsWith(root + path.sep);
 const resolvedTarget = path.resolve(absTarget);
 const tempRoots = [os.tmpdir(), '/tmp', '/private/tmp'].map((p) => path.resolve(p));
-if (tempRoots.some((root) => resolvedTarget === root || resolvedTarget.startsWith(root + path.sep))) {
+if (!isWithin(resolvedTarget, path.resolve(projectDir)) && tempRoots.some((root) => isWithin(resolvedTarget, root))) {
   process.exit(0);
 }
 
