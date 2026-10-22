@@ -16,27 +16,28 @@
  * No-op when cwd is the project root or any non-worktree path.
  * Always exits 0 (never hard-blocks: "ask" lets the user decide).
  */
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 /** @returns {string} */
 function readStdin() {
   try {
-    return fs.readFileSync(0, "utf8");
+    return fs.readFileSync(0, 'utf8');
   } catch {
-    return "";
+    return '';
   }
 }
 
 /** @type {any} */
 let event = {};
 try {
-  event = JSON.parse(readStdin() || "{}");
+  event = JSON.parse(readStdin() || '{}');
 } catch {
   process.exit(0);
 }
 
-const cwd = typeof event.cwd === "string" ? event.cwd : "";
+const cwd = typeof event.cwd === 'string' ? event.cwd : '';
 const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 
 // Only active when cwd is inside a worktree.
@@ -46,8 +47,7 @@ if (!m) process.exit(0);
 const wtPath = path.resolve(m[1]);
 
 const ti = event.tool_input ?? {};
-const targetPath =
-  typeof ti.file_path === "string" ? ti.file_path : typeof ti.path === "string" ? ti.path : "";
+const targetPath = typeof ti.file_path === 'string' ? ti.file_path : typeof ti.path === 'string' ? ti.path : '';
 
 if (!targetPath) process.exit(0);
 
@@ -56,6 +56,14 @@ const absTarget = path.isAbsolute(targetPath) ? targetPath : path.resolve(cwd, t
 // Allow writes inside the worktree (or to the worktree root itself).
 if (absTarget === wtPath || absTarget.startsWith(wtPath + path.sep)) process.exit(0);
 
+// Allow writes to temp dirs (the session scratchpad lives under /private/tmp): they are never the
+// project root this guard protects. Resolved first so a `..` segment cannot climb out of them.
+const resolvedTarget = path.resolve(absTarget);
+const tempRoots = [os.tmpdir(), '/tmp', '/private/tmp'].map((p) => path.resolve(p));
+if (tempRoots.some((root) => resolvedTarget === root || resolvedTarget.startsWith(root + path.sep))) {
+  process.exit(0);
+}
+
 const relTarget = path.relative(projectDir, absTarget);
 const relWt = path.relative(projectDir, wtPath);
 
@@ -63,13 +71,13 @@ const reason = [
   `Target file "${relTarget}" is outside the active worktree "${relWt}".`,
   `Active worktree: ${wtPath}`,
   `Intended? If you meant to edit the worktree copy, use the path inside "${wtPath}".`,
-].join("\n");
+].join('\n');
 
 process.stdout.write(
   JSON.stringify({
     hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'ask',
       permissionDecisionReason: reason,
     },
   }),
