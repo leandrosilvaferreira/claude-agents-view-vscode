@@ -4,7 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    exclude: ['**/node_modules/**', '**/dist/**', '**/out/**'],
+    // .claude/worktrees/ holds full repo copies made by isolated agents; their tests are not ours.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', '**/.claude/worktrees/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

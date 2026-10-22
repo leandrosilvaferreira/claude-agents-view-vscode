@@ -51,7 +51,12 @@ JSONL format — a deliberate Tolerant Reader (see
    `KNOWN_COMPATIBLE_CLAUDE_VERSION` in `src/claudeCompat.ts` to the new Claude Code CLI
    version. If the diff shows real structural drift instead, do NOT bump the pin — that is
    exactly the case this procedure exists to catch, and it needs parser investigation
-   (steps 1-3 above) before the pin is touched.
+   (steps 1-3 above) before the pin is touched. Once that investigation is done, the pin
+   MAY be bumped in the same change, but only when every new or changed shape is either
+   handled by the parser (with a regression test on a sanitized real capture) or confirmed
+   irrelevant to it, and a `docs/claude-code-<version>-validation.md` records which. The
+   README's "Last validated" line and a CHANGELOG entry move with the pin. Precedent:
+   2.1.306, where the new `api-request-blob` entries needed a parser fix.
 
 This procedure is a drift-detector and coverage-gap surfacer, not a schema validator.
 Never turn it into a runtime contract the parser is bound to — that was deliberately

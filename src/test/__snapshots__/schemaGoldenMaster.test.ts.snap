@@ -1,5 +1,23 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Schema golden master (schema-corpus fixtures) > agent-color: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "agent-color",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "agent-color.jsonl",
+  "projectName": "agent-color.jsonl",
+  "projectPath": "agent-color.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > agent-color: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
 exports[`Schema golden master (schema-corpus fixtures) > agent-name: LogParser.parse() produces a stable session shape 1`] = `
 {
   "gitBranch": "unknown",
@@ -36,6 +54,62 @@ exports[`Schema golden master (schema-corpus fixtures) > ai-title: LogParser.par
 `;
 
 exports[`Schema golden master (schema-corpus fixtures) > ai-title: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > api-request: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 4",
+  "gitBranch": "unknown",
+  "id": "api-request",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "api-request.jsonl",
+  "projectName": "api-request.jsonl",
+  "projectPath": "api-request.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > api-request: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > api-request-blob: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "gitBranch": "unknown",
+  "id": "api-request-blob",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "api-request-blob.jsonl",
+  "projectName": "api-request-blob.jsonl",
+  "projectPath": "api-request-blob.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > api-request-blob: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
+
+exports[`Schema golden master (schema-corpus fixtures) > api-request-shape: LogParser.parse() produces a stable session shape 1`] = `
+{
+  "claudeVersion": "Sample text 4",
+  "gitBranch": "unknown",
+  "id": "api-request-shape",
+  "lastInteractionTime": "<timestamp-normalized-for-determinism>",
+  "logFilePath": "<fixture-path-normalized-for-portability>",
+  "nameFromPrompt": false,
+  "projectHash": "api-request-shape.jsonl",
+  "projectName": "api-request-shape.jsonl",
+  "projectPath": "api-request-shape.jsonl",
+  "status": "stopped",
+  "subagents": [],
+  "type": "claude-code",
+}
+`;
+
+exports[`Schema golden master (schema-corpus fixtures) > api-request-shape: detectSubagents() runs against every sample line without throwing 1`] = `[]`;
 
 exports[`Schema golden master (schema-corpus fixtures) > artifact-autoreact-ledger: LogParser.parse() produces a stable session shape 1`] = `
 {
@@ -75,26 +149,25 @@ exports[`Schema golden master (schema-corpus fixtures) > artifact-comment-monito
 
 exports[`Schema golden master (schema-corpus fixtures) > assistant: LogParser.parse() produces a stable session shape 1`] = `
 {
-  "claudeVersion": "Sample text 21",
-  "entrypoint": "Sample text 18",
-  "gitBranch": "Sample text 22",
+  "claudeVersion": "Sample text 14",
+  "entrypoint": "Sample text 11",
+  "gitBranch": "Sample text 15",
   "id": "assistant",
   "knownProjectDirs": [
+    "Sample-text-17",
     "Sample-text-12",
-    "Sample-text-16",
-    "Sample-text-19",
   ],
-  "lastEntryIsApiError": false,
+  "lastEntryIsApiError": true,
   "lastEntryIsInterruption": false,
   "lastEntryIsThinking": false,
   "lastEntryType": "assistant",
   "lastInteractionTime": "<timestamp-normalized-for-determinism>",
   "logFilePath": "<fixture-path-normalized-for-portability>",
-  "model": "Sample text 2",
+  "model": "Sample text 5",
   "nameFromPrompt": false,
   "projectHash": "assistant.jsonl",
-  "projectName": "Sample text 19",
-  "projectPath": "Sample text 19",
+  "projectName": "Sample text 12",
+  "projectPath": "Sample text 12",
   "shutdownRecorded": false,
   "status": "stopped",
   "subagents": [],
@@ -124,20 +197,21 @@ exports[`Schema golden master (schema-corpus fixtures) > atis-latch: detectSubag
 
 exports[`Schema golden master (schema-corpus fixtures) > attachment: LogParser.parse() produces a stable session shape 1`] = `
 {
-  "claudeVersion": "Sample text 37",
-  "entrypoint": "Sample text 34",
-  "gitBranch": "Sample text 38",
+  "claudeVersion": "Sample text 13",
+  "entrypoint": "Sample text 10",
+  "gitBranch": "Sample text 14",
   "id": "attachment",
   "knownProjectDirs": [
+    "Sample-text-10",
+    "Sample-text-14",
     "Sample-text-11",
-    "Sample-text-35",
   ],
   "lastInteractionTime": "<timestamp-normalized-for-determinism>",
   "logFilePath": "<fixture-path-normalized-for-portability>",
   "nameFromPrompt": false,
   "projectHash": "attachment.jsonl",
-  "projectName": "Sample text 35",
-  "projectPath": "Sample text 35",
+  "projectName": "Sample text 11",
+  "projectPath": "Sample text 11",
   "status": "stopped",
   "subagents": [],
   "type": "claude-code",
@@ -437,22 +511,20 @@ exports[`Schema golden master (schema-corpus fixtures) > system-away_summary: de
 
 exports[`Schema golden master (schema-corpus fixtures) > system-compact_boundary: LogParser.parse() produces a stable session shape 1`] = `
 {
-  "claudeVersion": "Sample text 48",
-  "entrypoint": "Sample text 45",
-  "gitBranch": "Sample text 49",
+  "claudeVersion": "Sample text 63",
+  "entrypoint": "Sample text 60",
+  "gitBranch": "Sample text 64",
   "id": "system-compact_boundary",
-  "isSidechain": true,
   "knownProjectDirs": [
-    "Sample-text-48",
-    "Sample-text-106",
     "Sample-text-46",
+    "Sample-text-61",
   ],
   "lastInteractionTime": "<timestamp-normalized-for-determinism>",
   "logFilePath": "<fixture-path-normalized-for-portability>",
   "nameFromPrompt": false,
   "projectHash": "system-compact_boundary.jsonl",
-  "projectName": "Sample text 46",
-  "projectPath": "Sample text 46",
+  "projectName": "Sample text 61",
+  "projectPath": "Sample text 61",
   "status": "stopped",
   "subagents": [],
   "type": "claude-code",
@@ -463,20 +535,19 @@ exports[`Schema golden master (schema-corpus fixtures) > system-compact_boundary
 
 exports[`Schema golden master (schema-corpus fixtures) > system-informational: LogParser.parse() produces a stable session shape 1`] = `
 {
-  "claudeVersion": "Sample text 9",
-  "entrypoint": "Sample text 6",
-  "gitBranch": "Sample text 10",
+  "claudeVersion": "Sample text 10",
+  "entrypoint": "Sample text 7",
+  "gitBranch": "Sample text 11",
   "id": "system-informational",
   "knownProjectDirs": [
     "Sample-text-8",
-    "Sample-text-7",
   ],
   "lastInteractionTime": "<timestamp-normalized-for-determinism>",
   "logFilePath": "<fixture-path-normalized-for-portability>",
   "nameFromPrompt": false,
   "projectHash": "system-informational.jsonl",
-  "projectName": "Sample text 7",
-  "projectPath": "Sample text 7",
+  "projectName": "Sample text 8",
+  "projectPath": "Sample text 8",
   "status": "stopped",
   "subagents": [],
   "type": "claude-code",
@@ -492,6 +563,7 @@ exports[`Schema golden master (schema-corpus fixtures) > system-local_command: L
   "gitBranch": "Sample text 11",
   "id": "system-local_command",
   "knownProjectDirs": [
+    "Sample-text-10",
     "Sample-text-8",
   ],
   "lastInteractionTime": "<timestamp-normalized-for-determinism>",
@@ -510,20 +582,20 @@ exports[`Schema golden master (schema-corpus fixtures) > system-local_command: d
 
 exports[`Schema golden master (schema-corpus fixtures) > system-model_refusal_fallback: LogParser.parse() produces a stable session shape 1`] = `
 {
-  "claudeVersion": "Sample text 19",
-  "entrypoint": "Sample text 16",
-  "gitBranch": "Sample text 20",
+  "claudeVersion": "Sample text 20",
+  "entrypoint": "Sample text 17",
+  "gitBranch": "Sample text 21",
   "id": "system-model_refusal_fallback",
   "knownProjectDirs": [
-    "Sample-text-19",
     "Sample-text-17",
+    "Sample-text-18",
   ],
   "lastInteractionTime": "<timestamp-normalized-for-determinism>",
   "logFilePath": "<fixture-path-normalized-for-portability>",
   "nameFromPrompt": false,
   "projectHash": "system-model_refusal_fallback.jsonl",
-  "projectName": "Sample text 17",
-  "projectPath": "Sample text 17",
+  "projectName": "Sample text 18",
+  "projectPath": "Sample text 18",
   "status": "stopped",
   "subagents": [],
   "type": "claude-code",
@@ -580,14 +652,14 @@ exports[`Schema golden master (schema-corpus fixtures) > system-turn_duration: d
 
 exports[`Schema golden master (schema-corpus fixtures) > user: LogParser.parse() produces a stable session shape 1`] = `
 {
-  "claudeVersion": "Sample text 10",
-  "entrypoint": "Sample text 7",
-  "gitBranch": "Sample text 11",
+  "claudeVersion": "Sample text 16",
+  "entrypoint": "Sample text 13",
+  "gitBranch": "Sample text 17",
   "id": "user",
   "knownProjectDirs": [
+    "Sample-text-13",
     "Sample-text-10",
     "Sample-text-14",
-    "Sample-text-8",
   ],
   "lastEntryIsApiError": false,
   "lastEntryIsInterruption": false,
@@ -597,9 +669,9 @@ exports[`Schema golden master (schema-corpus fixtures) > user: LogParser.parse()
   "logFilePath": "<fixture-path-normalized-for-portability>",
   "nameFromPrompt": true,
   "projectHash": "user.jsonl",
-  "projectName": "Sample text 8",
-  "projectPath": "Sample text 8",
-  "sessionTitle": "Sample text 2",
+  "projectName": "Sample text 14",
+  "projectPath": "Sample text 14",
+  "sessionTitle": "Sample text 3",
   "shutdownRecorded": false,
   "status": "stopped",
   "subagents": [],

@@ -175,8 +175,10 @@ function detectTeammateIdleCompletion(json: LogEntry, currentSubagents: Map<stri
 
 /** A backgrounded agent reports completion as a <task-notification> turn in the PARENT transcript.
  * A classic Agent-tool dispatch carries the <tool-use-id> of the tool_use that spawned it — the
- * key subagents are stored under. A forked-skill launch (forkedSkillDetector.ts) never had a
- * tool_use, so its notification carries only <task-id>, which IS the agentId it was keyed under.
+ * key subagents are stored under. A `<forked-skill-launch>` fork (forkedSkillDetector.ts's
+ * detectForkedSkillLaunch) never had a tool_use, so its notification carries only <task-id>, which
+ * IS the agentId it was keyed under. A model-invoked fork (detectForkedSkillResult) is keyed by its
+ * Skill tool_use id instead, and its notification usually carries that id as <tool-use-id>.
  * Both are tried independently. The <tool-use-id> path is a plain map-key lookup that no-ops on a
  * miss. The <task-id> path goes through markStoppedByTaskId, which ALSO matches on `.agentId` —
  * so a classic subagent's own <task-id> can resolve too, since subagentMetadata fills `.agentId`
@@ -244,14 +246,18 @@ function entryTime(json: LogEntry): number | undefined {
 
 /**
  * <task-id> is the agentId. For a subagent whose map key still equals its agentId, this is
- * exactly markStopped(). It only diverges after a SendMessage resume (reactivateSubagent)
- * re-keys the entry to the resume's own tool_use id while leaving `.agentId` untouched — a
- * plain map.get(id) would then miss, leaving the subagent stuck 'working' forever, which (via
- * sessionDedupe.applyNestedAgentLiveness) pins the whole parent session 'working' too.
+ * exactly markStopped(). It diverges once the key is a tool_use id instead: after a SendMessage
+ * resume (reactivateSubagent) re-keys the entry to the resume's own tool_use id while leaving
+ * `.agentId` untouched, or for a model-invoked fork (forkedSkillDetector.ts's detectForkedSkillResult),
+ * keyed by its Skill tool_use id from the start — a plain map.get(id) would then miss, leaving the
+ * subagent stuck 'working' forever, which (via sessionDedupe.applyNestedAgentLiveness) pins the whole
+ * parent session 'working' too.
  *
- * DEFENSIVE, not a fix for a reproduced failure: no transcript observed so far has actually hit
- * this path — the one real post-resume notification seen carried BOTH tags, and <tool-use-id>
- * alone already resolved it. This guards a plausible shape that just hasn't shown up yet.
+ * Not merely defensive: model-invoked forks hit this `.agentId` fallback in 2 of 11 real first
+ * completions (a <task-id>-only notification, e.g. after the fork was messaged mid-run), pinned by
+ * logParser.forkedSkill.test.ts; subagentLiveness.realLogs.test.ts exercises it for a re-woken
+ * classic subagent. The SendMessage re-key itself has not hit it yet: the one real post-resume
+ * notification seen carried BOTH tags, and <tool-use-id> alone already resolved it.
  */
 function markStoppedByTaskId(currentSubagents: Map<string, SubAgent>, taskId: string, at: number | undefined): void {
   if (currentSubagents.has(taskId)) {

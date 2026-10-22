@@ -1,6 +1,6 @@
 import { SubAgent } from './types';
 import type { LogEntry } from './logParser';
-import { detectForkedSkillLaunch } from './forkedSkillDetector';
+import { detectForkedSkillLaunch, detectForkedSkillResult } from './forkedSkillDetector';
 import {
   detectAgentsKilled,
   detectCompletions,
@@ -23,6 +23,10 @@ import {
  * never shares one Set across repeated calls — every existing direct unit test — sees every id as
  * new every time, so the dedup silently no-ops and prior behavior is unchanged for them.
  *
+ * The same Set also guards a model-invoked forked Skill's tool_result, on its tool_use_id
+ * (forkedSkillDetector.ts's detectForkedSkillResult): replaying it would reset a finished subagent
+ * to 'working'.
+ *
  * Claude-only: Antigravity has no equivalent re-append behavior on record, and its own
  * re-invocation of a tool call already flips the matching id back to 'working' via
  * detectAntigravityCalls' unconditional `set()`, which is correct there (see
@@ -40,6 +44,7 @@ export function detectSubagents(
   detectSessionShutdown(json, currentSubagents);
   detectClaudeStandaloneCalls(json, currentSubagents);
   detectForkedSkillLaunch(json, currentSubagents);
+  detectForkedSkillResult(json, currentSubagents, seenToolUseIds);
   detectCompletions(json, currentSubagents);
 }
 
