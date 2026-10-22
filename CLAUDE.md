@@ -186,7 +186,9 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `chunkedLineReader.ts`, never as one Buffer/string — plus a per-file `seenToolUseIds`
   set carried across those incremental reads — subagentDetector.ts's guard against
   re-appended history lines); builds a `Session`, delegates title, subagent and
-  project-path extraction. `new LogParser(projectsDir, { readChunkBytes, maxLineBytes })`
+  project-path extraction. Drops `api-request-blob` lines (CLI 2.1.301+) before any reader:
+  copies of turns already parsed from their own entries (`isApiRequestBlob`,
+  `transcriptEntry.ts`). `new LogParser(projectsDir, { readChunkBytes, maxLineBytes })`
   shrinks the chunk and the line limit (tests only; an invalid value falls back to the
   default).
 - **chunkedLineReader.ts** — `readLinesInChunks`: reads a byte range of an open file in
@@ -219,9 +221,11 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   `subagentCompletion.ts`.
 - **subagentDetector.ts** — detects subagent start/stop from a log entry across both
   Claude and Antigravity shapes, incl. async-launch ACK vs real `<task-notification>`.
-  Three Claude launch shapes, only one of which is a `tool_use`: classic `Agent` tool,
-  `<forked-skill-launch>` on a `type:"system"` entry (`context: fork` skills like
-  `/code-review`), and in-process teammates (grandchildren — deliberately not detected).
+  Four Claude launch shapes: classic `Agent` tool, `<forked-skill-launch>` on a
+  `type:"system"` entry (a `context: fork` skill run as a slash command, like `/code-review`),
+  the same fork started by the MODEL through the `Skill` tool — only its tool_result says so
+  (`status:"forked"`, 2.1.288+; `forkedSkillDetector.ts`'s `detectForkedSkillResult`) — and
+  in-process teammates (grandchildren — deliberately not detected).
   Skips a launch/SendMessage `tool_use` id already seen earlier in the same file
   (`seenToolUseIds`/`isReplay`, Claude-only): Claude Code re-appends earlier history lines
   verbatim (same ids/timestamps) on relocation/resume, and replaying them either resurrected
@@ -232,7 +236,7 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   350-line budget): the three real completion shapes — synchronous `tool_result`,
   `<task-notification>`, and an in-process teammate's `<teammate-message>`
   `idle_notification` — after the launch/resume ACK filter of `subagentLaunchAck.ts`. That
-  async/teammate ACK (or a `<forked-skill-launch>` at launch) also flags the subagent
+  async/teammate/forked ACK (or a `<forked-skill-launch>` at launch) also flags the subagent
   `isBackground`, which
   `detectAgentsKilled` uses to stop every still-`working` BACKGROUND subagent on a
   `system:agents_killed` entry (Claude Code 2.1.258+, no Antigravity equivalent) while
@@ -244,7 +248,8 @@ subagents → dedupe/nest → render tree. All source under `src/`:
   beside the successor session.
 - **subagentLaunchAck.ts** — the launch/resume ACK half of `subagentCompletion.ts` (split out
   for the 350-line budget): the ACKs that must NOT read as completions (`async_launched`,
-  `teammate_spawned`, SendMessage's `resumedAgentId`, a queued-message `{success:true, pin}`,
+  `teammate_spawned`, a model-invoked skill's `forked`, SendMessage's `resumedAgentId`, a
+  queued-message `{success:true, pin}`,
   or a teammate-inbox send `{success:true, routing}`), plus what a launch `tool_result`
   records about the subagent (`agentId`, `isBackground`). Never stops a subagent.
 - **sidecarReader.ts** — reads the `agent-<id>.meta.json` sidecars from both candidate

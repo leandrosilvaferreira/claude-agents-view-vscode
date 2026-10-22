@@ -4,13 +4,13 @@
 
 - [No public transcript schema](architecture-no-public-transcript-schema.md) — Claude Code's JSONL format is undocumented/unstable; always verify against real logs, never assume shape.
 
-- [Bookkeeping entries carry no `message`](architecture-transcript-bookkeeping-entries.md) — `attachment`/`last-prompt`/`queue-operation`/`ai-title` trail every real turn; activity heuristics must gate on `message`, not `type`.
+- [Bookkeeping entries carry no `message`](architecture-transcript-bookkeeping-entries.md) — gate turn signals on `message`, not `type`; except `api-request-blob` (CLI 2.1.301+): has `message`, is no turn — dropped in parseLogLine.
 
 - [Why tsconfig pins `types: ["node"]`](architecture-types-node-pin-under-nodenext.md) — an ESM-flagged transitive `@types/chai` kills global `@types` inclusion under NodeNext; looks like a broken `@types/node` but isn't.
 
 - [Green fixtures prove nothing here](architecture-fixtures-hide-real-log-shapes.md) — 153 tests + 2 reviews passed a parser bug that one run against real transcripts caught; validate against `~/.claude/projects/**`.
 
-- [Three subagent dispatch mechanisms](architecture-subagent-dispatch-mechanisms.md) — classic `Agent` tool_use vs `<forked-skill-launch>` (`<task-id>` completion) vs in-process teammates (`teammate_spawned` ACK, `<teammate-message>` idle_notification).
+- [Four subagent dispatch mechanisms](architecture-subagent-dispatch-mechanisms.md) — `Agent` tool_use; `<forked-skill-launch>`; teammates (`teammate_spawned`); model `Skill` fork (`status:"forked"`, 2.1.288+).
 
 - [Parent-side completion is not final](architecture-parent-completion-not-final.md) — queued-SendMessage ACK `{success,pin}` (no `resumedAgentId`) + post-`<task-notification>` re-wake; test cold parse AND line-by-line replay.
 

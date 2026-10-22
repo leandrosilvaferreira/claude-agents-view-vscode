@@ -6,7 +6,7 @@ import { extractRenamedTitle, extractSessionName, isKnownWorktreeAutoStamp } fro
 import { ProjectPathResolver } from './projectPathResolver';
 import { detectSubagents } from './subagentDetector';
 import { enrichSubagentMetadata } from './subagentMetadata';
-import { LogEntry } from './transcriptEntry';
+import { LogEntry, isApiRequestBlob } from './transcriptEntry';
 import { trackTurnSignals, trackApiErrorSignal, trackShutdownSignal } from './turnSignals';
 import { CodexLogParser } from './codexLogParser';
 import { readLinesInChunks, READ_CHUNK_BYTES, MAX_LINE_BYTES } from './chunkedLineReader';
@@ -161,6 +161,8 @@ export class LogParser {
     }
     try {
       const json = JSON.parse(line) as LogEntry;
+      // Drop a blob: it only copies a turn parsed from its own entry (see isApiRequestBlob).
+      if (isApiRequestBlob(json)) return;
       // Subagent transcripts (<sessionId>/subagents/agent-*.jsonl, or same-dir sidechains) mark
       // every entry isSidechain:true. Flag the session so it's excluded from the standalone list —
       // otherwise the recursive **/*.jsonl watcher surfaces it as a phantom top-level session whose

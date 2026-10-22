@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-10-21
+
+### Fixed
+
+- A background agent that is still running no longer moves to **Completed Agents** as soon as Claude Code sends its next request, and its session no longer reads as idle once the transcript goes quiet. Claude Code 2.1.301 and later also log each API request in the transcript, including a copy of every message not logged before (`api-request-blob` lines), and the parser took those copies for real turns: the copy of a background agent's launch acknowledgement lacks its `async_launched` status, so it read as the agent's completion. The parser now drops these lines before anything reads them. In every transcript checked, the turn a copy repeats already has its own entry, so nothing is lost.
+- The same copies had four quieter effects, now gone: the copy of a finished agent's completion notification overwrote its recorded completion time, which switched off the detection of an agent that resumes after finishing; a copy at the end of the transcript hid a user turn still waiting for the model's reply; the same copy cleared the markers that a session had ended on an API error or had shut down; and a session's title could be taken from a copy, so it read `<system-reminder> …` instead of your prompt.
+- A skill that Claude itself runs in the background now shows up as a subagent. Since Claude Code 2.1.288, when the model calls a `context: fork` skill (such as code-review) through the Skill tool, the skill runs as a background agent, often for over an hour, but nothing marked its launch except the tool result (`status: "forked"`), so it never appeared in the tree. It is now listed under **Working Agents** while it runs and moves to **Completed Agents** when its completion notification arrives.
+
+### Changed
+
+- Validated against Claude Code 2.1.306 (the previous pin was 2.1.286), so the "unvalidated Claude Code version" warning no longer appears for 2.1.287 through 2.1.306. Unlike the previous bump, the transcript schema did not change only additively: Claude Code added four entry types (three of them in 2.1.301), one of which needed the parser change above, and the parser reads nothing of the other additions. See the [validation notes](docs/claude-code-2.1.306-validation.md).
+
 ## [0.6.1] - 2026-10-01
 
 ### Changed

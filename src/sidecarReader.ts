@@ -124,12 +124,13 @@ function dedupeSidecars(sidecars: SidecarMetadata[]): SidecarMetadata[] {
 
 // Cache of parsed sidecar CONTENT (never a derived status — see nestedSubagents.ts's
 // computeChildStatus) per subagents/ directory, keyed by its absolute path. Invalidated by
-// comparing the current *.meta.json filename listing against the one last seen — sidecars are
-// written once at launch and never rewritten afterward (no evidence anywhere in this codebase of
-// Claude Code touching one again post-creation), so "same filenames as last time" is a safe,
-// cheap proxy for "same content as last time", and avoids a directory-mtime comparison whose
-// resolution on some filesystems can be too coarse to reliably detect two changes landing in the
-// same tick. Needed because nestedSubagents.ts's refreshNestedSubagents now runs on every 15s
+// comparing the current *.meta.json filename listing against the one last seen — every field read
+// here is written once at launch. Since CLI 2.1.301 Claude Code rewrites a sidecar once more when
+// its agent ends, merging in `finished: true` (or `stoppedByUser: true`), but it changes none of
+// those launch fields, so "same filenames as last time" stays a safe, cheap proxy for "same
+// content as last time" here (a reader of `finished` would need a real invalidation). It also
+// avoids a directory-mtime comparison whose resolution on some filesystems can be too coarse to
+// reliably detect two changes landing in the same tick. Needed because nestedSubagents.ts's refreshNestedSubagents now runs on every 15s
 // tick (and every file-change refresh) for every session with subagents, not just when a
 // transcript happens to grow — without this, that re-reads and re-JSON.parses every sidecar every
 // time, even for sessions where nothing changed. Module-level and never evicted: the number of

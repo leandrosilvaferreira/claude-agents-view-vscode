@@ -7,8 +7,8 @@ export interface SubAgent {
   launchId?: string; // Original launch tool_use id, preserved when a SendMessage resume re-keys `id` (subagentDetector.ts) so subagentMetadata's sidecar join keeps matching
   agentId?: string; // Raw agentId from the sidecar filename (agent-<id>.meta.json) — the other form SendMessage's `to` may target when launch set no `name` (subagentMetadata.ts)
   // True once this subagent is confirmed to be running in the background: its ACK carried
-  // `status: 'async_launched'`/`'teammate_spawned'`, it launched via a `<forked-skill-launch>`
-  // (both always run in the background), or it was RESUMED via SendMessage
+  // `status: 'async_launched'`/`'teammate_spawned'`/`'forked'` (a model-invoked forked Skill), it launched
+  // via a `<forked-skill-launch>` (all always run in the background), or it was RESUMED via SendMessage
   // (subagentDetector.ts's reactivateSubagent — Claude Code always resumes a finished subagent in
   // the background, even one originally launched synchronously). Undefined only for a synchronous
   // Agent call still awaiting its own first tool_result — subagentCompletion.ts's

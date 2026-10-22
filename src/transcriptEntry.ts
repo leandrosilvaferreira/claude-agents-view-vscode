@@ -29,8 +29,16 @@ export interface LogEntry {
   // (see `subtype` below), which never carries `message` at all.
   apiError?: string;
   isApiErrorMessage?: boolean;
-  // Present on a tool_result entry. For a backgrounded Agent it carries status 'async_launched'.
-  toolUseResult?: { status?: string; isAsync?: boolean; agentId?: string; resolvedModel?: string };
+  // Present on a tool_result entry. For a backgrounded Agent it carries status 'async_launched'; for a
+  // model-invoked Skill that forked into a background subagent, status 'forked' + agentId (an inline
+  // Skill call carries `commandName` alone, no status). `commandName` is the skill's name.
+  toolUseResult?: {
+    status?: string;
+    isAsync?: boolean;
+    agentId?: string;
+    resolvedModel?: string;
+    commandName?: string;
+  };
   // `queued_command` attachments carry a backgrounded agent's completion notification in `prompt`.
   attachment?: { prompt?: string };
   content?: Array<{ type: string; text?: string }> | string;
@@ -93,4 +101,33 @@ export interface LogEntry {
   // a session relocates OUT of a worktree back to a bare cwd (see detectWorktreeName's KNOWN
   // LIMITATION comment on why that signal is deliberately NOT used to clear session.worktreeName).
   worktreeSession?: { worktreeName?: string; worktreePath?: string } | null;
+}
+
+/**
+ * True for a `type: "api-request-blob"` line. From Claude Code 2.1.301 on, every API request is
+ * logged into the session transcript: an `api-request` line (no `message`, harmless) preceded by one
+ * content-addressed `{ type, sessionId, hash, message: { role, content } }` blob per message not
+ * logged before, written just before the `api-request` line of the NEXT request. A `user` or
+ * `assistant` blob is a COPY of a turn that already has its own entry, minus every other field of
+ * that entry: no `timestamp`, `uuid`, `isSidechain` or `toolUseResult` (a subagent transcript's blobs
+ * add only `agentId`). A `system` blob (the most common kind, usually the last before its
+ * `api-request`) carries the request's system prompt and tool list and copies no turn at all.
+ *
+ * Because a blob has a `message`, every reader gated on `message` takes it for a real turn:
+ * - subagentCompletion.ts: the copy of an async-launch ACK lacks `toolUseResult.status`, so it reads
+ *   as a completion and stops a background subagent that is still running; the copy of a
+ *   `<task-notification>` re-stops a finished one with no timestamp, overwriting its real `stoppedAt`
+ *   with undefined, which silently disables subagentRewake.ts.
+ * - turnSignals.ts: a blob that is the last message-bearing line replaces `lastEntryType` (hiding a
+ *   user turn still awaiting its reply while the model generates), rewrites `lastEntryIsThinking`
+ *   and `lastEntryIsInterruption`, and clears `lastEntryIsApiError` and `shutdownRecorded`.
+ * - nameExtractor.ts: its `message.role === 'user'` test makes a blob a candidate session title.
+ *
+ * LogParser.parseLogLine therefore drops the line before any reader sees it. Nothing is lost: in
+ * every real transcript with blobs (1,429), each tool_use, tool_result and notification id a blob
+ * carries also has its own entry, and parsing the file without its blob lines yields the same
+ * Session. Claude-only: Antigravity never writes this type, so the gate is a no-op for that brand.
+ */
+export function isApiRequestBlob(json: LogEntry): boolean {
+  return json.type === 'api-request-blob';
 }

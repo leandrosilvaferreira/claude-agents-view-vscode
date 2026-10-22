@@ -5,10 +5,10 @@ import type { LogEntry } from './transcriptEntry';
  * Launch/resume ACK side of subagent tracking, split out of subagentCompletion.ts (the only
  * caller) to keep that file inside this repo's 350-line budget. A launch's tool_result comes back
  * almost at once and is NOT the agent finishing: an async-launch ACK (`async_launched`), an
- * in-process teammate's spawn ACK (`teammate_spawned`) and SendMessage's own acks must never be
- * read as completions. This file collects those ACK predicates plus what a launch's tool_result
- * records about the subagent (the agentId Claude Code assigned, whether it runs backgrounded).
- * Nothing here stops a subagent.
+ * in-process teammate's spawn ACK (`teammate_spawned`), a model-invoked forked skill's ACK
+ * (`forked`) and SendMessage's own acks must never be read as completions. This file collects those
+ * ACK predicates plus what a launch's tool_result records about the subagent (the agentId Claude
+ * Code assigned, whether it runs backgrounded). Nothing here stops a subagent.
  */
 
 /** A tool_result's `toolUseResult.agentId` names the agentId Claude Code assigned — not only on
@@ -36,8 +36,8 @@ export function recordResultAgentId(json: LogEntry, currentSubagents: Map<string
   }
 }
 
-/** True for either ACK shape that must NOT be read as a completion: an async-launch/teammate ACK
- * or a SendMessage-ack (which ACKs a MESSAGE, not a launch — see isSendMessageAck's own doc
+/** True for either ACK shape that must NOT be read as a completion: an async-launch/teammate/forked
+ * ACK or a SendMessage-ack (which ACKs a MESSAGE, not a launch — see isSendMessageAck's own doc
  * comment). Pure predicate — background-ness is recorded separately by markBackground, called
  * unconditionally from detectCompletions (subagentCompletion.ts), not as a side effect of this
  * check. */
@@ -45,7 +45,7 @@ export function isLaunchOrSendMessageAck(json: LogEntry): boolean {
   return isAsyncLaunchAck(json) || isSendMessageAck(json);
 }
 
-/** Flags the subagent this async-launch/teammate ACK targets as backgrounded — same
+/** Flags the subagent this async-launch/teammate/forked ACK targets as backgrounded — same
  * message.content walk as recordResultAgentId above, keyed by the ACK's own tool_use_id. Checks
  * isAsyncLaunchAck itself (rather than relying on the caller to gate it) so detectCompletions can
  * call it unconditionally without gaining a branch; in particular this is NOT true for a
@@ -77,8 +77,15 @@ function isAsyncLaunchAck(json: LogEntry): boolean {
   // — and, since nothing was working, the parent session itself read 'stopped' too.
   // Their real completion is the teammate idle_notification (subagentCompletion.ts's
   // detectTeammateIdleCompletion), NOT a <task-notification>.
+  // 'forked' is the same ACK for a `context: fork` skill the MODEL invoked through the built-in Skill
+  // tool (Claude Code ~2.1.288+, observed on 2.1.288-2.1.289): {success, commandName, status:'forked',
+  // background:true, agentId, result:"Running in the background as @<skill>"} ~150ms after the Skill
+  // tool_use, while the review keeps running for about 45 minutes to 3.5 hours. Without it here the result read as the
+  // subagent's completion and stopped it on the spot (forkedSkillDetector.ts's detectForkedSkillResult
+  // is what creates it). Its real completion is the <task-notification>. An INLINE Skill call gets
+  // {success, commandName} with no `status` at all, so it is no ACK and never a subagent.
   const status = json.toolUseResult?.status;
-  return status === 'async_launched' || status === 'teammate_spawned';
+  return status === 'async_launched' || status === 'teammate_spawned' || status === 'forked';
 }
 
 function isSendMessageAck(json: LogEntry): boolean {

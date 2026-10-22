@@ -1,12 +1,17 @@
 ---
 name: architecture-subagent-dispatch-mechanisms
-description: Three different Claude Code mechanisms write into <session>/subagents/, and only one of them is a tool_use the parser can see.
+description: Four Claude Code mechanisms write into <session>/subagents/ with different launch shapes — Agent tool_use, <forked-skill-launch>, in-process teammate, and (2.1.288+) a Skill tool_result with status "forked".
 metadata:
   type: architecture
 ---
 
-Claude Code has **three** dispatch mechanisms writing to `<sessionId>/subagents/`, and they
-do NOT share a launch shape:
+Claude Code has **four** dispatch mechanisms writing to `<sessionId>/subagents/`, and they
+do NOT share a launch shape. (4, CLI 2.1.288+): the MODEL invoking the `Skill` tool on a
+`context: fork` skill — only the `tool_result` tells it forked: `toolUseResult {status:"forked",
+background:true, agentId, commandName}` (an inline skill gets `{success, commandName}` only).
+Completion is a `<task-notification>` that always carries `<task-id>` (agentId) and usually
+`<tool-use-id>` (the Skill id; 2/11 real first completions had `<task-id>` only); sidecar has no
+`toolUseId`. Detected by `detectForkedSkillResult` (forkedSkillDetector.ts).
 
 1. **Classic `Agent` tool** — a `tool_use` block; sidecar has `toolUseId`. The only one
    `detectClaudeCalls` ever saw.
@@ -44,7 +49,7 @@ launch payload itself.
 no-op line; the whole session showed as `working` with zero subagents and nothing in the code
 hinted why. Cost three rounds of on-disk evidence to pin down.
 
-**How to apply:** before touching subagent detection, ask which of the three mechanisms a log
+**How to apply:** before touching subagent detection, ask which of the four mechanisms a log
 came from. Never assume a subagent implies a `tool_use`. Gate any new
 `<forked-skill-launch>` reading on `type === 'system'` + the **top-level** `content` string —
 agent reports paste that tag verbatim into message text, and reading it via `getEntryText`
